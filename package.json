@@ -1,0 +1,56 @@
+{
+    "name": "decillion",
+    "version": "0.0.0",
+    "description": "A Million.js-inspired high-performance UI renderer for Roblox-TS",
+    "main": "out/index.js",
+    "types": "out/index.d.ts",
+    "scripts": {
+        "build": "npm run build:dev && npm run build:example",
+        "build:example": "cd example && rbxtsc",
+        "build:dev": "tsc",
+        "dev": "tsc --watch",
+        "test": "vitest",
+        "lint": "eslint src --ext .ts,.tsx",
+        "lint:fix": "eslint src --ext .ts,.tsx --fix",
+        "prepublishOnly": "npm run build"
+    },
+    "keywords": [
+        "roblox",
+        "roblox-ts",
+        "ui",
+        "renderer",
+        "performance",
+        "million"
+    ],
+    "author": "evilbocchi",
+    "license": "MIT",
+    "devDependencies": {
+        "@eslint/js": "^9.34.0",
+        "@rbxts/compiler-types": "^3.0.0-types.0",
+        "@rbxts/types": "^1.0.879",
+        "@types/node": "^24.3.0",
+        "@types/react": "^19.1.12",
+        "eslint": "^9.34.0",
+        "eslint-plugin-roblox-ts": "^1.1.0",
+        "prettier": "^3.6.2",
+        "roblox-ts": "^3.0.0",
+        "rojo": "^1.0.2",
+        "rokit-npm": "^1.0.1",
+        "typescript": "^5.5.3",
+        "typescript-eslint": "^8.40.0"
+    },
+    "dependencies": {
+        "@rbxts/react": "^17.2.3",
+        "@rbxts/react-roblox": "^17.2.3",
+        "@rbxts/services": "^1.5.1"
+    },
+    "files": [
+        "out/**/*",
+        "README.md",
+        "LICENSE"
+    ],
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/evilbocchi/decillion.git"
+    }
+}

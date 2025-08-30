@@ -1,0 +1,12 @@
+{
+    "name": "@rbxts/decillion-example",
+    "private": true,
+    "dependencies": {
+        "decillion": "file:../"
+    },
+    "devDependencies": {
+        "@rbxts/react": "^17.2.3",
+        "@rbxts/types": "^1.0.879",
+        "roblox-ts": "^3.0.0"
+    }
+}
