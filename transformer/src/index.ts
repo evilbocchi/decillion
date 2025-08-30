@@ -33,7 +33,23 @@ function millionTransformer(
 
             // Quick check: if the file doesn't contain JSX, don't transform it
             const sourceText = sourceFile.getFullText();
-            if (!sourceText.includes('<')) {
+            
+            // More sophisticated JSX detection
+            const hasJsx = (function() {
+                // Check for obvious JSX patterns
+                if (sourceText.includes('<frame') || 
+                    sourceText.includes('<textlabel') || 
+                    sourceText.includes('<textbutton') ||
+                    sourceText.includes('</')) {
+                    return true;
+                }
+                
+                // Check for JSX-style tags (< followed by a letter, not operators like <, <=, etc.)
+                const jsxPattern = /<[a-zA-Z][^>]*>/;
+                return jsxPattern.test(sourceText);
+            })();
+            
+            if (!hasJsx) {
                 return sourceFile;
             }
 
