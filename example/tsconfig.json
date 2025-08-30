@@ -27,7 +27,7 @@
         "experimentalDecorators": true,
         "plugins": [
             {
-                "transform": "decillion"
+                "transform": "rbxts-transformer-decillion"
             }
         ]
     },

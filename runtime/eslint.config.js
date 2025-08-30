@@ -34,10 +34,6 @@ export default [
         ignores: [
             'out/**',
             'node_modules/**',
-            'docsout/**',
-            'include/**',
-            'test/**',
-            "scripts/**"
         ]
     }
 ];

@@ -1,0 +1,45 @@
+{
+    "name": "@rbxts/decillion-runtime",
+    "version": "0.0.0",
+    "description": "A Million.js-inspired high-performance UI renderer for Roblox-TS",
+    "main": "out/init.luau",
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/evilbocchi/decillion.git"
+    },
+    "keywords": [
+        "roblox",
+        "roblox-ts",
+        "ui",
+        "renderer",
+        "performance",
+        "million"
+    ],
+    "bugs": {
+        "url": "https://github.com/evilbocchi/decillion/issues"
+    },
+    "homepage": "https://github.com/evilbocchi/decillion#readme",
+    "types": "out/index.d.ts",
+    "files": [
+        "out",
+        "!**/*.tsbuildinfo"
+    ],
+    "author": "evilbocchi",
+    "license": "MIT",
+    "publishConfig": {
+        "access": "public"
+    },
+    "devDependencies": {
+        "@rbxts/compiler-types": "^3.0.0-types.0",
+        "@rbxts/types": "^1.0.879",
+        "@typescript-eslint/eslint-plugin": "^8.41.0",
+        "@typescript-eslint/parser": "^8.41.0",
+        "eslint": "^9.34.0",
+        "eslint-plugin-roblox-ts": "^1.1.0",
+        "roblox-ts": "^3.0.0",
+        "typescript": "^5.5.3"
+    },
+    "peerDependencies": {
+        "@rbxts/react": "^17.2.3"
+    }
+}

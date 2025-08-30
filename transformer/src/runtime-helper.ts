@@ -10,17 +10,7 @@ export class RuntimeHelper {
    * Adds a signature comment to indicate the file was transformed by Decillion
    */
   addTransformerSignature(sourceFile: ts.SourceFile, customMessage?: string): ts.SourceFile {
-    const defaultSignature = `/**
- * This file was optimized by Decillion - Million.js-inspired Roblox-TS transformer
- * Generated on: ${new Date().toISOString()}
- * Transformer version: 1.0.0
- * 
- * Original source: ${sourceFile.fileName}
- * Optimizations applied: Block memoization, static extraction, efficient diffing
- * 
- * @see https://github.com/evilbocchi/decillion
- * @generated Automatically generated - do not edit directly
- */`;
+    const defaultSignature = `// optimized by decillion`;
 
     const signature = customMessage ? `/**\n * ${customMessage}\n * Generated on: ${new Date().toISOString()}\n * @generated\n */` : defaultSignature;
 
