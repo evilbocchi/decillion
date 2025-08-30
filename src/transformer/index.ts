@@ -4,10 +4,27 @@ import { BlockTransformer } from "./block-transformer";
 import { RuntimeHelper } from "./runtime-helper";
 
 /**
+ * Configuration options for the Decillion transformer
+ */
+export interface DecillionTransformerOptions {
+    /** Whether to add signature comments to transformed files */
+    addSignature?: boolean;
+    /** Custom signature message (if addSignature is true) */
+    signatureMessage?: string;
+    /** Enable debug logging */
+    debug?: boolean;
+}
+
+/**
  * Million.js-inspired TypeScript transformer for Roblox-TS
  * Transforms JSX into highly optimized, block-memoized UI code
  */
-function millionTransformer(program: ts.Program): ts.TransformerFactory<ts.SourceFile> {
+function millionTransformer(
+    program: ts.Program,
+    options: DecillionTransformerOptions = {}
+): ts.TransformerFactory<ts.SourceFile> {
+    const { addSignature = true, signatureMessage, debug = false } = options;
+    
     return (context: ts.TransformationContext) => {
         return (sourceFile: ts.SourceFile) => {
             const typeChecker = program.getTypeChecker();
@@ -48,17 +65,31 @@ function millionTransformer(program: ts.Program): ts.TransformerFactory<ts.Sourc
                 visitNode
             ) as ts.SourceFile;
 
-            if (blockTransformer.hasGeneratedBlocks()) {
-                return runtimeHelper.addRuntimeImports(transformedSourceFile);
+            // Add signature to indicate this file was transformed (if enabled)
+            let signedSourceFile = transformedSourceFile;
+            if (addSignature) {
+                signedSourceFile = runtimeHelper.addTransformerSignature(
+                    transformedSourceFile,
+                    signatureMessage
+                );
             }
 
-            return transformedSourceFile;
+            if (blockTransformer.hasGeneratedBlocks()) {
+                return runtimeHelper.addRuntimeImports(signedSourceFile);
+            }
+
+            return signedSourceFile;
         };
     };
 }
 
 // Export the transformer for use in tsconfig
 export { millionTransformer };
+
+// Create a helper function for default usage
+export function createDecillionTransformer(options?: DecillionTransformerOptions) {
+    return (program: ts.Program) => millionTransformer(program, options);
+}
 
 // Default export for ttypescript plugin usage
 export default millionTransformer;

@@ -6,7 +6,7 @@
     "types": "out/index.d.ts",
     "scripts": {
         "build": "npm run build:dev && npm run build:example",
-        "build:example": "cd example && rbxtsc",
+        "build:example": "cd example && npm i && rbxtsc",
         "build:dev": "tsc",
         "dev": "tsc --watch",
         "test": "vitest",

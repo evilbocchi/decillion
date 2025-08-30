@@ -1,6 +1,62 @@
 # decillion
 
-A Million.js-inspired high-performance UI renderer for Roblox-TS that brings compile-time optimizations and block memoization to your Roblox UI code.
+A Million.js-inspired high-performance UI renderer for Roblox-TS that brings compile-time optimizations and block memoization to you## 🔧 Configuration
+
+### Transformer Options
+
+```json
+{
+  "transform": "decillion",
+  "options": {
+    "enableStaticOptimization": true,
+    "enableBlockMemoization": true,
+    "debugMode": false,
+    "addSignature": true,
+    "signatureMessage": "Custom optimization message"
+  }
+}
+```
+
+#### Available Options
+
+- `enableStaticOptimization` (boolean): Enable static element caching
+- `enableBlockMemoization` (boolean): Enable block memoization
+- `debugMode` (boolean): Add debug logging to generated code  
+- `addSignature` (boolean): Add transformer signature to generated files (default: true)
+- `signatureMessage` (string): Custom message for the signature comment
+
+### File Signatures
+
+By default, Decillion adds a signature comment to transformed files:
+
+```tsx
+/**
+ * This file was optimized by Decillion - Million.js-inspired Roblox-TS transformer
+ * Generated on: 2025-08-30T10:30:45.123Z
+ * Transformer version: 1.0.0
+ * 
+ * Original source: src/components/Counter.tsx
+ * Optimizations applied: Block memoization, static extraction, efficient diffing
+ * 
+ * @see https://github.com/evilbocchi/decillion
+ * @generated Automatically generated - do not edit directly
+ */
+```
+
+You can disable signatures or customize the message:
+
+```tsx
+// Using the helper function
+import { createDecillionTransformer } from "decillion";
+
+const transformer = createDecillionTransformer({
+  addSignature: false, // Disable signatures
+  // OR
+  signatureMessage: "Optimized by MyApp build system"
+});
+```
+
+### Runtime Configuration.
 
 ## ⚡ Performance First
 

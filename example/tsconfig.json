@@ -27,7 +27,7 @@
         "experimentalDecorators": true,
         "plugins": [
             {
-                "transform": "../out/transformer"
+                "transform": "decillion"
             }
         ]
     },

@@ -7,6 +7,49 @@ export class RuntimeHelper {
   constructor(private context: ts.TransformationContext) {}
 
   /**
+   * Adds a signature comment to indicate the file was transformed by Decillion
+   */
+  addTransformerSignature(sourceFile: ts.SourceFile, customMessage?: string): ts.SourceFile {
+    const defaultSignature = `/**
+ * This file was optimized by Decillion - Million.js-inspired Roblox-TS transformer
+ * Generated on: ${new Date().toISOString()}
+ * Transformer version: 1.0.0
+ * 
+ * Original source: ${sourceFile.fileName}
+ * Optimizations applied: Block memoization, static extraction, efficient diffing
+ * 
+ * @see https://github.com/evilbocchi/decillion
+ * @generated Automatically generated - do not edit directly
+ */`;
+
+    const signature = customMessage ? `/**\n * ${customMessage}\n * Generated on: ${new Date().toISOString()}\n * @generated\n */` : defaultSignature;
+
+    // Create a leading comment for the first statement or add to file start
+    const statements = sourceFile.statements;
+    if (statements.length > 0) {
+        const firstStatement = statements[0];
+        const newFirstStatement = ts.addSyntheticLeadingComment(
+            firstStatement,
+            ts.SyntaxKind.MultiLineCommentTrivia,
+            signature.slice(3, -2), // Remove /** and */ from the signature
+            true // Add newline after comment
+        );
+        
+        return ts.factory.updateSourceFile(
+            sourceFile,
+            [newFirstStatement, ...statements.slice(1)],
+            sourceFile.isDeclarationFile,
+            sourceFile.referencedFiles,
+            sourceFile.typeReferenceDirectives,
+            sourceFile.hasNoDefaultLib,
+            sourceFile.libReferenceDirectives
+        );
+    }
+    
+    return sourceFile;
+  }
+
+  /**
    * Adds runtime imports to the source file for block memoization
    */
   addRuntimeImports(sourceFile: ts.SourceFile): ts.SourceFile {
