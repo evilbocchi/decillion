@@ -3,6 +3,9 @@
     "version": "0.0.0",
     "description": "A Million.js-inspired high-performance UI renderer for Roblox-TS",
     "main": "out/index.js",
+    "scripts": {
+        "build": "tsc"
+    },
     "license": "MIT",
     "repository": {
         "type": "git",

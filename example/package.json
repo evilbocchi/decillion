@@ -1,11 +1,17 @@
 {
     "name": "@rbxts/decillion-example",
     "private": true,
+    "scripts": {
+        "build": "npx rimraf out && rbxtsc"
+    },
     "dependencies": {
         "@rbxts/decillion-runtime": "file://../runtime",
         "@rbxts/react": "^17.2.3",
         "@rbxts/types": "^1.0.879",
         "rbxts-transformer-decillion": "file://../transformer",
         "roblox-ts": "^3.0.0"
+    },
+    "devDependencies": {
+        "rimraf": "^6.0.1"
     }
 }

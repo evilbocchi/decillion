@@ -3,6 +3,9 @@
     "version": "0.0.0",
     "description": "A Million.js-inspired high-performance UI renderer for Roblox-TS",
     "main": "out/init.luau",
+    "scripts": {
+        "build": "rbxtsc"
+    },
     "repository": {
         "type": "git",
         "url": "https://github.com/evilbocchi/decillion.git"

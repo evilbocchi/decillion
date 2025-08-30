@@ -24,9 +24,19 @@ function millionTransformer(
     options: DecillionTransformerOptions = {}
 ): ts.TransformerFactory<ts.SourceFile> {
     const { addSignature = true, signatureMessage, debug = false } = options;
-    
+
     return (context: ts.TransformationContext) => {
         return (sourceFile: ts.SourceFile) => {
+            if (debug) {
+                console.log(`Decillion transformer processing: ${sourceFile.fileName}`);
+            }
+
+            // Quick check: if the file doesn't contain JSX, don't transform it
+            const sourceText = sourceFile.getFullText();
+            if (!sourceText.includes('<') || !sourceText.includes('jsx')) {
+                return sourceFile;
+            }
+
             const typeChecker = program.getTypeChecker();
 
             // Initialize our transformation components
@@ -38,47 +48,66 @@ function millionTransformer(
             );
             const runtimeHelper = new RuntimeHelper(context);
 
-            function visitNode(node: ts.Node): ts.Node {
-                // Check if this is a JSX element that we can optimize
+            // Use a more defensive visitor approach
+            function visit(node: ts.Node): ts.Node {
+                // Only transform specific node types we care about
                 if (ts.isJsxElement(node) || ts.isJsxSelfClosingElement(node)) {
-                    return blockTransformer.transformJsxElement(node);
+                    try {
+                        return blockTransformer.transformJsxElement(node);
+                    } catch (error) {
+                        if (debug) {
+                            console.warn(`Failed to transform JSX element: ${error}`);
+                        }
+                        return node; // Return original node if transformation fails
+                    }
                 }
 
-                // Check if this is a function component we can optimize
                 if (
                     ts.isFunctionDeclaration(node) ||
                     ts.isArrowFunction(node) ||
                     ts.isFunctionExpression(node)
                 ) {
-                    const optimized = blockTransformer.transformComponent(node);
-                    if (optimized) {
-                        return optimized;
+                    try {
+                        const optimized = blockTransformer.transformComponent(node);
+                        if (optimized) {
+                            return optimized;
+                        }
+                    } catch (error) {
+                        if (debug) {
+                            console.warn(`Failed to transform component: ${error}`);
+                        }
                     }
                 }
 
-                return ts.visitEachChild(node, visitNode, context);
+                // For all other nodes, recursively visit children
+                return ts.visitEachChild(node, visit, context);
             }
 
-            // Add runtime helpers to the top of the file if needed
-            const transformedSourceFile = ts.visitNode(
-                sourceFile,
-                visitNode
-            ) as ts.SourceFile;
+            try {
+                // Transform the source file
+                const transformedSourceFile = ts.visitNode(sourceFile, visit) as ts.SourceFile;
 
-            // Add signature to indicate this file was transformed (if enabled)
-            let signedSourceFile = transformedSourceFile;
-            if (addSignature) {
-                signedSourceFile = runtimeHelper.addTransformerSignature(
-                    transformedSourceFile,
-                    signatureMessage
-                );
+                // Add signature to indicate this file was transformed (if enabled)
+                let signedSourceFile = transformedSourceFile;
+                if (addSignature) {
+                    signedSourceFile = runtimeHelper.addTransformerSignature(
+                        transformedSourceFile,
+                        signatureMessage
+                    );
+                }
+
+                if (blockTransformer.hasGeneratedBlocks()) {
+                    return runtimeHelper.addRuntimeImports(signedSourceFile);
+                }
+
+                return signedSourceFile;
+            } catch (error) {
+                if (debug) {
+                    console.warn(`Transformation failed for ${sourceFile.fileName}: ${error}`);
+                }
+                // Return original file if transformation completely fails
+                return sourceFile;
             }
-
-            if (blockTransformer.hasGeneratedBlocks()) {
-                return runtimeHelper.addRuntimeImports(signedSourceFile);
-            }
-
-            return signedSourceFile;
         };
     };
 }
