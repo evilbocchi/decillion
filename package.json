@@ -38,7 +38,7 @@
         "roblox-ts": "^3.0.0",
         "rojo": "^1.0.2",
         "rokit-npm": "^1.0.1",
-        "typescript": "^5.5.3",
+        "typescript": "^5.8.3",
         "typescript-eslint": "^8.40.0"
     },
     "dependencies": {

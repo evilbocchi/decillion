@@ -10,31 +10,32 @@ export class RuntimeHelper {
      * Adds a signature comment to indicate the file was transformed by Decillion
      */
     addTransformerSignature(sourceFile: ts.SourceFile, customMessage?: string): ts.SourceFile {
-        const signature = customMessage ?? `// optimized by decillion`;
+        // Create a detailed signature matching the README format
+        const signature = customMessage ?? `*
+ * This file was optimized by Decillion - Million.js-inspired Roblox-TS transformer
+ * Generated on: ${new Date().toISOString()}
+ * Transformer version: 1.0.0
+ * 
+ * Original source: ${sourceFile.fileName}
+ * Optimizations applied: Block memoization, static extraction, efficient diffing
+ * 
+ * @see https://github.com/evilbocchi/decillion
+ * @generated Automatically generated - do not edit directly
+ `;
 
-        // Create a leading comment for the first statement or add to file start
-        const statements = sourceFile.statements;
-        if (statements.length > 0) {
-            const firstStatement = statements[0];
-            const newFirstStatement = ts.addSyntheticLeadingComment(
-                firstStatement,
-                ts.SyntaxKind.MultiLineCommentTrivia,
-                signature,
-                true // Add newline after comment
-            );
+        // Get the full text and add the signature at the beginning
+        const originalText = sourceFile.getFullText();
+        const signatureComment = `/**${signature}*/\n`;
+        const newText = signatureComment + originalText;
 
-            return ts.factory.updateSourceFile(
-                sourceFile,
-                [newFirstStatement, ...statements.slice(1)],
-                sourceFile.isDeclarationFile,
-                sourceFile.referencedFiles,
-                sourceFile.typeReferenceDirectives,
-                sourceFile.hasNoDefaultLib,
-                sourceFile.libReferenceDirectives
-            );
-        }
-
-        return sourceFile;
+        // Create a new source file with the signature
+        return ts.createSourceFile(
+            sourceFile.fileName,
+            newText,
+            sourceFile.languageVersion,
+            true, // setParentNodes
+            sourceFile.scriptKind
+        );
     }
 
     /**

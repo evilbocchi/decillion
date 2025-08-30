@@ -33,7 +33,7 @@ function millionTransformer(
 
             // Quick check: if the file doesn't contain JSX, don't transform it
             const sourceText = sourceFile.getFullText();
-            if (!sourceText.includes('<') || !sourceText.includes('jsx')) {
+            if (!sourceText.includes('<')) {
                 return sourceFile;
             }
 
@@ -105,7 +105,17 @@ function millionTransformer(
                 if (debug) {
                     console.warn(`Transformation failed for ${sourceFile.fileName}: ${error}`);
                 }
-                // Return original file if transformation completely fails
+                // Even if transformation fails, still add signature if requested
+                if (addSignature) {
+                    try {
+                        return runtimeHelper.addTransformerSignature(sourceFile, signatureMessage);
+                    } catch (signatureError) {
+                        if (debug) {
+                            console.warn(`Signature addition also failed: ${signatureError}`);
+                        }
+                    }
+                }
+                // Return original file if everything fails
                 return sourceFile;
             }
         };
