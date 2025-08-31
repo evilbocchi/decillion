@@ -58,60 +58,21 @@ function millionTransformer(
                 const sourceText = file.getFullText();
                 const hasOptimizableElements = sourceText.includes('<frame') || sourceText.includes('<textlabel') || sourceText.includes('<textbutton');
                 
-                if (hasOptimizableElements && debug) {
-                    console.log(`Found Roblox UI elements - creating simple static optimization`);
+                if (hasOptimizableElements) {
+                    if (debug) {
+                        console.log(`Found Roblox UI elements in source text`);
+                    }
                     
-                    // Instead of adding a function, let's find the main function and add optimization logging inside it
-                    const statements = file.statements.map(statement => {
-                        if (ts.isFunctionDeclaration(statement) && statement.name?.text === 'OptimizedApp') {
-                            // Add a console.log call at the beginning of the function
-                            const body = statement.body;
-                            if (body) {
-                                const logStatement = ts.factory.createExpressionStatement(
-                                    ts.factory.createCallExpression(
-                                        ts.factory.createPropertyAccessExpression(
-                                            ts.factory.createIdentifier("console"),
-                                            ts.factory.createIdentifier("log")
-                                        ),
-                                        undefined,
-                                        [ts.factory.createStringLiteral("Decillion: UI optimizations applied")]
-                                    )
-                                );
-                                
-                                const newBody = ts.factory.createBlock([
-                                    logStatement,
-                                    ...body.statements
-                                ]);
-                                
-                                return ts.factory.updateFunctionDeclaration(
-                                    statement,
-                                    statement.modifiers,
-                                    statement.asteriskToken,
-                                    statement.name,
-                                    statement.typeParameters,
-                                    statement.parameters,
-                                    statement.type,
-                                    newBody
-                                );
-                            }
-                        }
-                        return statement;
-                    });
-                    
-                    const optimizedFile = ts.factory.updateSourceFile(
-                        file,
-                        statements,
-                        file.isDeclarationFile,
-                        file.referencedFiles,
-                        file.typeReferenceDirectives,
-                        file.hasNoDefaultLib,
-                        file.libReferenceDirectives
-                    );
-                    
-                    return { file: optimizedFile, hasOptimizableElements };
+                    // For now, let's just return the file as optimizable so runtime imports get added
+                    // We'll implement actual JSX transformation in a future iteration
+                    return { file, hasOptimizableElements: true };
                 }
                 
-                return { file, hasOptimizableElements };
+                if (debug) {
+                    console.log(`No Roblox UI elements found in source text`);
+                }
+                
+                return { file, hasOptimizableElements: false };
             };
 
             try {
