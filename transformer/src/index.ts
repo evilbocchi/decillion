@@ -19,7 +19,7 @@ export interface DecillionTransformerOptions {
  * Million.js-inspired TypeScript transformer for Roblox-TS
  * Transforms JSX into highly optimized, block-memoized UI code
  */
-function millionTransformer(
+function transformer(
     program: ts.Program,
     options: DecillionTransformerOptions = {}
 ): ts.TransformerFactory<ts.SourceFile> {
@@ -304,14 +304,4 @@ function millionTransformer(
     };
 }
 
-// Export the transformer for use in tsconfig
-export { millionTransformer };
-
-// Create a helper function for default usage
-export function createDecillionTransformer(options?: DecillionTransformerOptions) {
-    return (program: ts.Program) => millionTransformer(program, options);
-}
-
-// Default export for ttypescript plugin usage
-export default millionTransformer;
-
+export default transformer;

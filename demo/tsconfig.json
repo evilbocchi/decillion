@@ -3,6 +3,11 @@
         // required
         "allowSyntheticDefaultImports": true,
         "downlevelIteration": true,
+        "plugins": [
+            {
+                "transform": "rbxts-transformer-decillion"
+            }
+        ],
         "jsx": "react",
         "jsxFactory": "React.createElement",
         "jsxFragmentFactory": "React.createFragment",
@@ -24,12 +29,7 @@
         "baseUrl": "src",
         "incremental": true,
         "tsBuildInfoFile": "out/tsconfig.tsbuildinfo",
-        "experimentalDecorators": true,
-        "plugins": [
-            {
-                "transform": "rbxts-transformer-decillion"
-            }
-        ]
+        "experimentalDecorators": true
     },
     "include": [
         "src/**/*"
