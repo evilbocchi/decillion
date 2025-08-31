@@ -1,6 +1,5 @@
 import React, { useState } from "@rbxts/react";
 
-// This will be optimized by our transformer
 export default function OptimizedApp() {
   const [count, setCount] = useState(0);
 
