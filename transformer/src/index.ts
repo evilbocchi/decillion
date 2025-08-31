@@ -98,6 +98,80 @@ function millionTransformer(
                 }
             };
 
+            // Helper function to check if a JSX element is static
+            const isStaticJSXElement = (attributes: ts.JsxAttributes, children: readonly ts.JsxChild[]): boolean => {
+                // Check if all attributes are static
+                for (const prop of attributes.properties) {
+                    if (ts.isJsxAttribute(prop)) {
+                        if (prop.initializer) {
+                            if (ts.isJsxExpression(prop.initializer)) {
+                                if (prop.initializer.expression && !isStaticExpression(prop.initializer.expression)) {
+                                    return false;
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // Check if all children are static
+                for (const child of children) {
+                    if (ts.isJsxElement(child) || ts.isJsxSelfClosingElement(child)) {
+                        const childElementName = ts.isJsxElement(child) 
+                            ? child.openingElement.tagName 
+                            : child.tagName;
+                        const childAttributes = ts.isJsxElement(child) 
+                            ? child.openingElement.attributes 
+                            : child.attributes;
+                        const childChildren = ts.isJsxElement(child) ? child.children : [];
+                        
+                        if (!isStaticJSXElement(childAttributes, childChildren)) {
+                            return false;
+                        }
+                    } else if (ts.isJsxExpression(child)) {
+                        if (child.expression && !isStaticExpression(child.expression)) {
+                            return false;
+                        }
+                    } else if (ts.isJsxText(child)) {
+                        // JSX text is always static
+                        continue;
+                    }
+                }
+
+                return true;
+            };
+
+            // Helper function to convert JSX attributes to an object literal
+            const createPropsObjectFromJSXAttributes = (attributes: ts.JsxAttributes): ts.Expression => {
+                if (attributes.properties.length === 0) {
+                    return ts.factory.createObjectLiteralExpression([]);
+                }
+
+                const props: ts.PropertyAssignment[] = [];
+                
+                for (const prop of attributes.properties) {
+                    if (ts.isJsxAttribute(prop) && ts.isIdentifier(prop.name)) {
+                        const key = prop.name.text;
+                        let value: ts.Expression;
+                        
+                        if (prop.initializer) {
+                            if (ts.isStringLiteral(prop.initializer)) {
+                                value = prop.initializer;
+                            } else if (ts.isJsxExpression(prop.initializer) && prop.initializer.expression) {
+                                value = prop.initializer.expression;
+                            } else {
+                                value = ts.factory.createTrue(); // Default for boolean attributes
+                            }
+                        } else {
+                            value = ts.factory.createTrue(); // Boolean attribute with no value
+                        }
+                        
+                        props.push(ts.factory.createPropertyAssignment(key, value));
+                    }
+                }
+                
+                return ts.factory.createObjectLiteralExpression(props);
+            };
+
             // Helper function to check if a createElement call is static
             const isStaticCreateElementCall = (props: ts.Expression, children: ts.Expression[]): boolean => {
                 // Check if props are static
@@ -213,83 +287,274 @@ function millionTransformer(
 
             try {
                 if (debug) {
-                    console.log(`Analyzing file for optimization opportunities...`);
+                    console.log(`Analyzing file for AST-based optimization opportunities...`);
+                    console.log(`Source file kind: ${sourceFile.kind}`);
+                    console.log(`Source text preview: ${sourceFile.getFullText().substring(0, 300)}...`);
                 }
 
-                // Get the source text for string-based analysis
-                const sourceText = sourceFile.getFullText();
-                
-                // Check if this file contains Roblox UI elements that we can optimize
-                const hasRobloxUI = sourceText.includes('<frame') || 
-                                   sourceText.includes('<textlabel') || 
-                                   sourceText.includes('<textbutton');
+                let hasOptimizations = false;
 
-                if (!hasRobloxUI) {
+                // Debug: log all node types to understand the AST structure
+                if (debug) {
+                    console.log(`Debugging AST structure...`);
+                    let nodeCount = 0;
+                    const logNodeTypes = (node: ts.Node, depth = 0): void => {
+                        nodeCount++;
+                        if (nodeCount > 20) return; // Limit total nodes to avoid spam
+                        
+                        const indent = "  ".repeat(depth);
+                        const nodeKindName = ts.SyntaxKind[node.kind];
+                        console.log(`${indent}${nodeKindName} (${nodeCount})`);
+                        
+                        if (ts.isIdentifier(node)) {
+                            console.log(`${indent}  - text: "${node.text}"`);
+                        }
+                        
+                        ts.forEachChild(node, child => logNodeTypes(child, depth + 1));
+                    };
+                    logNodeTypes(sourceFile);
+                }
+                const checkForOptimizableElements = (node: ts.Node): boolean => {
                     if (debug) {
-                        console.log(`No Roblox UI elements found`);
+                        // Log all node types we encounter to understand the AST structure
+                        const nodeKindName = ts.SyntaxKind[node.kind];
+                        if (nodeKindName.includes("Jsx") || nodeKindName.includes("Call")) {
+                            console.log(`Found node type: ${nodeKindName}`);
+                        }
+                        
+                        if (ts.isJsxElement(node)) {
+                            console.log(`Found JSX element: ${node.openingElement.tagName.getText()}`);
+                        } else if (ts.isJsxSelfClosingElement(node)) {
+                            console.log(`Found self-closing JSX element: ${node.tagName.getText()}`);
+                        } else if (ts.isCallExpression(node)) {
+                            const expr = node.expression;
+                            if (ts.isPropertyAccessExpression(expr)) {
+                                console.log(`Found call expression: ${expr.expression.getText()}.${expr.name.getText()}`);
+                                if (ts.isIdentifier(expr.expression) &&
+                                    expr.expression.text === "React" &&
+                                    ts.isIdentifier(expr.name) &&
+                                    expr.name.text === "createElement") {
+                                    console.log(`Found React.createElement call`);
+                                }
+                            }
+                        }
+                    }
+                    
+                    // Check for JSX elements
+                    if (ts.isJsxElement(node) || ts.isJsxSelfClosingElement(node)) {
+                        const elementName = ts.isJsxElement(node) 
+                            ? node.openingElement.tagName 
+                            : node.tagName;
+                        
+                        if (ts.isIdentifier(elementName)) {
+                            const name = elementName.text;
+                            if (name === "frame" || name === "textlabel" || name === "textbutton") {
+                                return true;
+                            }
+                        }
+                    }
+                    
+                    // Check for React.createElement calls
+                    if (ts.isCallExpression(node)) {
+                        const expr = node.expression;
+                        if (ts.isPropertyAccessExpression(expr) &&
+                            ts.isIdentifier(expr.expression) &&
+                            expr.expression.text === "React" &&
+                            ts.isIdentifier(expr.name) &&
+                            expr.name.text === "createElement") {
+                            
+                            if (node.arguments.length > 0 && ts.isStringLiteral(node.arguments[0])) {
+                                const elementType = node.arguments[0].text;
+                                if (elementType === "frame" || elementType === "textlabel" || elementType === "textbutton") {
+                                    return true;
+                                }
+                            }
+                        }
+                    }
+                    
+                    return ts.forEachChild(node, checkForOptimizableElements) || false;
+                };
+
+                const needsOptimization = checkForOptimizableElements(sourceFile);
+                
+                if (!needsOptimization) {
+                    if (debug) {
+                        console.log(`No Roblox UI JSX elements or React.createElement calls found`);
                     }
                     return sourceFile;
                 }
 
                 if (debug) {
-                    console.log(`Found Roblox UI elements, applying string-based optimizations`);
+                    console.log(`Found Roblox UI elements, applying AST-based optimizations`);
                 }
 
-                // Apply string-based transformation as a proof of concept
-                let optimizedText = sourceText;
-                
-                // Add the runtime import at the top of the file (after existing imports)
-                const importRegex = /(import.*from.*["'].*["'];?\s*\n)/g;
-                const imports = optimizedText.match(importRegex) || [];
-                
-                if (imports.length > 0) {
-                    // Find the last import
-                    let lastImportIndex = 0;
-                    let match;
-                    const regex = /(import.*from.*["'].*["'];?\s*\n)/g;
-                    while ((match = regex.exec(optimizedText)) !== null) {
-                        lastImportIndex = match.index + match[0].length;
+                // Track if we need to add the runtime import
+                let needsRuntimeImport = false;
+
+                // Updated visitor function to transform JSX elements
+                const transformVisitor = (node: ts.Node): ts.Node => {
+                    // Handle JSX elements
+                    if (ts.isJsxElement(node) || ts.isJsxSelfClosingElement(node)) {
+                        const elementName = ts.isJsxElement(node) 
+                            ? node.openingElement.tagName 
+                            : node.tagName;
+                        
+                        if (ts.isIdentifier(elementName)) {
+                            const name = elementName.text;
+                            
+                            // Check if this is a Roblox UI element
+                            if (name === "frame" || name === "textlabel" || name === "textbutton") {
+                                const attributes = ts.isJsxElement(node) 
+                                    ? node.openingElement.attributes 
+                                    : node.attributes;
+                                const children = ts.isJsxElement(node) ? node.children : [];
+                                
+                                // Check if this element is static
+                                const isStatic = isStaticJSXElement(attributes, children);
+                                
+                                if (isStatic) {
+                                    if (debug) {
+                                        console.log(`Transforming static JSX ${name} to createStaticElement`);
+                                    }
+                                    needsRuntimeImport = true;
+                                    hasOptimizations = true;
+                                    
+                                    // Convert JSX attributes to object literal
+                                    const props = createPropsObjectFromJSXAttributes(attributes);
+                                    const childrenArgs: ts.Expression[] = children.length > 0 ? 
+                                        children.map(child => ts.visitNode(child, transformVisitor) as ts.Expression).filter(Boolean) : [];
+                                    
+                                    // Create a call to createStaticElement
+                                    return ts.factory.createCallExpression(
+                                        ts.factory.createIdentifier("createStaticElement"),
+                                        undefined,
+                                        [
+                                            ts.factory.createStringLiteral(name),
+                                            props,
+                                            ...childrenArgs
+                                        ]
+                                    );
+                                } else {
+                                    if (debug) {
+                                        console.log(`JSX ${name} is dynamic, keeping as JSX`);
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    // Handle React.createElement calls as fallback (shouldn't be needed at JSX stage)
+                    if (ts.isCallExpression(node)) {
+                        const expr = node.expression;
+                        if (ts.isPropertyAccessExpression(expr) &&
+                            ts.isIdentifier(expr.expression) &&
+                            expr.expression.text === "React" &&
+                            ts.isIdentifier(expr.name) &&
+                            expr.name.text === "createElement") {
+                            
+                            if (node.arguments.length > 0 && ts.isStringLiteral(node.arguments[0])) {
+                                const elementType = node.arguments[0].text;
+                                
+                                // Check if this is a Roblox UI element
+                                if (elementType === "frame" || elementType === "textlabel" || elementType === "textbutton") {
+                                    const props = node.arguments[1] || ts.factory.createNull();
+                                    const children = node.arguments.slice(2);
+                                    
+                                    // Check if this is static
+                                    const isStatic = isStaticCreateElementCall(props, children);
+                                    
+                                    if (isStatic) {
+                                        if (debug) {
+                                            console.log(`Transforming static ${elementType} to createStaticElement`);
+                                        }
+                                        needsRuntimeImport = true;
+                                        hasOptimizations = true;
+                                        
+                                        // Transform to createStaticElement call
+                                        return ts.factory.createCallExpression(
+                                            ts.factory.createIdentifier("createStaticElement"),
+                                            undefined,
+                                            [node.arguments[0], props, ...children]
+                                        );
+                                    } else {
+                                        if (debug) {
+                                            console.log(`${elementType} is dynamic, keeping React.createElement`);
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    return ts.visitEachChild(node, transformVisitor, context);
+                };
+
+                // Transform the AST
+                let transformedSourceFile = ts.visitNode(sourceFile, transformVisitor) as ts.SourceFile;
+
+                // Add runtime import if needed
+                if (needsRuntimeImport) {
+                    if (debug) {
+                        console.log(`Adding runtime import for createStaticElement`);
                     }
                     
-                    const runtimeImport = `import { createStaticElement, useMemoizedBlock } from "@rbxts/decillion-runtime";\n`;
-                    optimizedText = optimizedText.slice(0, lastImportIndex) + 
-                                   runtimeImport + 
-                                   optimizedText.slice(lastImportIndex);
+                    // Create the import statement
+                    const runtimeImport = ts.factory.createImportDeclaration(
+                        undefined,
+                        ts.factory.createImportClause(
+                            false,
+                            undefined,
+                            ts.factory.createNamedImports([
+                                ts.factory.createImportSpecifier(
+                                    false,
+                                    undefined,
+                                    ts.factory.createIdentifier("createStaticElement")
+                                )
+                            ])
+                        ),
+                        ts.factory.createStringLiteral("@rbxts/decillion-runtime")
+                    );
+
+                    // Add signature comment as well
+                    const signatureComment = "// Optimized by Decillion - static elements converted to createStaticElement calls";
                     
-                    if (debug) {
-                        console.log(`Added runtime import after existing imports`);
+                    // Create new statements array with the import added after existing imports
+                    const statements = [...transformedSourceFile.statements];
+                    let insertIndex = 0;
+                    
+                    // Find where to insert the import (after existing imports)
+                    for (let i = 0; i < statements.length; i++) {
+                        if (ts.isImportDeclaration(statements[i])) {
+                            insertIndex = i + 1;
+                        } else {
+                            break;
+                        }
                     }
+                    
+                    statements.splice(insertIndex, 0, runtimeImport);
+                    
+                    transformedSourceFile = ts.factory.updateSourceFile(
+                        transformedSourceFile,
+                        statements
+                    );
+
+                    // Add the signature comment by creating a new source file with the comment
+                    const sourceText = transformedSourceFile.getFullText();
+                    const commentedText = `${signatureComment}\n${sourceText}`;
+                    
+                    transformedSourceFile = ts.createSourceFile(
+                        sourceFile.fileName,
+                        commentedText,
+                        sourceFile.languageVersion,
+                        true
+                    );
                 }
 
-                // Simple transformation: replace some static JSX with createStaticElement calls
-                // This is a proof of concept - in reality we'd need proper parsing
-                
-                // Transform static textlabel elements
-                const staticTextLabelRegex = /<textlabel\s+([^>]*Text=["']([^"']*)["'][^>]*\/?)>/g;
-                optimizedText = optimizedText.replace(staticTextLabelRegex, (match, attributes, text) => {
-                    if (debug) {
-                        console.log(`Transforming static textlabel: ${text}`);
-                    }
-                    return `{createStaticElement("textlabel", { Text: "${text}", ${extractStaticAttributes(attributes)} })}`;
-                });
-
-                // Add a signature comment to show the file was processed
-                optimizedText = `// Optimized by Decillion - static elements converted to createStaticElement calls\n${optimizedText}`;
-
-                if (debug) {
-                    console.log(`Applied string-based transformation with JSX replacement`);
-                    console.log(`Optimized text preview: ${optimizedText.substring(0, 200)}...`);
+                if (hasOptimizations && debug) {
+                    console.log(`Applied ${hasOptimizations ? 'optimizations' : 'no optimizations'} to ${sourceFile.fileName}`);
                 }
 
-                // Create a new source file with the modified text
-                const newSourceFile = ts.createSourceFile(
-                    sourceFile.fileName,
-                    optimizedText,
-                    sourceFile.languageVersion,
-                    true
-                );
-
-                return newSourceFile;
+                return transformedSourceFile;
             } catch (error) {
                 if (debug) {
                     console.warn(`Transformation failed for ${sourceFile.fileName}: ${error}`);
