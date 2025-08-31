@@ -255,7 +255,7 @@ export default function (program: ts.Program, options: DecillionTransformerOptio
                         lastImportIndex = match.index + match[0].length;
                     }
 
-                    const runtimeImport = `import { createStaticElement, useMemoizedBlock } from "@rbxts/decillion-runtime";\n`;
+                    const runtimeImport = `import { createStaticElement } from "@rbxts/decillion-runtime";\n`;
                     optimizedText = optimizedText.slice(0, lastImportIndex) +
                         runtimeImport +
                         optimizedText.slice(lastImportIndex);
