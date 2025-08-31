@@ -577,6 +577,9 @@ export function createDecillionTransformer(options?: DecillionTransformerOptions
     return (program: ts.Program) => millionTransformer(program, options);
 }
 
-// Default export for ttypescript plugin usage
-export default millionTransformer;
+// Import working transformer
+import workingDecillionTransformer from "./working-transformer";
+
+// Default export for ttypescript plugin usage - use working transformer
+export default workingDecillionTransformer;
 
