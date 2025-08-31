@@ -41,6 +41,8 @@ export class RuntimeHelper {
      * Adds runtime imports to the source file for block memoization
      */
     addRuntimeImports(sourceFile: ts.SourceFile): ts.SourceFile {
+        console.log(`[RuntimeHelper] Adding runtime imports to ${sourceFile.fileName}`);
+        
         // Create import for our runtime helpers
         const runtimeImport = ts.factory.createImportDeclaration(
             undefined,
@@ -65,13 +67,14 @@ export class RuntimeHelper {
                     )
                 ])
             ),
-            ts.factory.createStringLiteral("decillion/runtime")
+            ts.factory.createStringLiteral("@rbxts/decillion-runtime")
         );
 
         // Add the import to the beginning of the file
         const statements = [runtimeImport, ...sourceFile.statements];
+        console.log(`[RuntimeHelper] Created ${statements.length} statements (was ${sourceFile.statements.length})`);
 
-        return ts.factory.updateSourceFile(
+        const result = ts.factory.updateSourceFile(
             sourceFile,
             statements,
             sourceFile.isDeclarationFile,
@@ -80,6 +83,9 @@ export class RuntimeHelper {
             sourceFile.hasNoDefaultLib,
             sourceFile.libReferenceDirectives
         );
+        
+        console.log(`[RuntimeHelper] Returning updated source file`);
+        return result;
     }
 
     /**
