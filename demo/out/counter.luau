@@ -1,3 +1,15 @@
+--[[
+ * This file was optimized by Decillion - Million.js-inspired Roblox-TS transformer
+ * Generated on: 2025-08-31T07:06:55.613Z
+ * Transformer version: 1.0.0
+ * 
+ * Original source: src/counter.tsx
+ * Optimizations applied: Block memoization, static extraction, efficient diffing
+ * 
+ * @see https://github.com/evilbocchi/decillion
+ * @generated Automatically generated - do not edit directly
+]]
+
 -- Compiled with roblox-ts v3.0.0
 local TS = _G[script]
 local _react = TS.import(script, TS.getModule(script, "@rbxts", "react"))

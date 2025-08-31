@@ -27,7 +27,8 @@
         "experimentalDecorators": true,
         "plugins": [
             {
-                "transform": "rbxts-transformer-decillion"
+                "transform": "rbxts-transformer-decillion",
+                "addSignature": true
             }
         ]
     },

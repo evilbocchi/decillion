@@ -2,7 +2,7 @@
     "name": "@rbxts/decillion-example",
     "private": true,
     "scripts": {
-        "build": "npx rimraf out && rbxtsc"
+        "build": "npx rimraf out && rbxtsc && node add-signature.js"
     },
     "dependencies": {
         "@rbxts/decillion-runtime": "file://../runtime",
@@ -12,6 +12,7 @@
         "roblox-ts": "^3.0.0"
     },
     "devDependencies": {
+        "@rbxts/compiler-types": "^3.0.0-types.0",
         "rimraf": "^6.0.1"
     }
 }

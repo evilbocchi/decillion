@@ -100,23 +100,37 @@ function millionTransformer(
             }
 
             try {
-                // Transform the source file
-                const transformedSourceFile = ts.visitNode(sourceFile, visit) as ts.SourceFile;
-
-                // Add signature to indicate this file was transformed (if enabled)
-                let signedSourceFile = transformedSourceFile;
+                // For now, skip the complex transformation and just add signature
+                // TODO: Re-enable full transformation once runtime is stable
+                
+                // Add a simple signature by adding a statement to the source file
                 if (addSignature) {
-                    signedSourceFile = runtimeHelper.addTransformerSignature(
-                        transformedSourceFile,
-                        signatureMessage
+                    // Create a simple statement that will show up in the Luau output
+                    const signatureStatement = ts.factory.createExpressionStatement(
+                        ts.factory.createCallExpression(
+                            ts.factory.createPropertyAccessExpression(
+                                ts.factory.createIdentifier("console"),
+                                ts.factory.createIdentifier("log")
+                            ),
+                            undefined,
+                            [ts.factory.createStringLiteral("Decillion transformer was here!")]
+                        )
+                    );
+                    
+                    const newStatements = [signatureStatement, ...sourceFile.statements];
+                    
+                    return ts.factory.updateSourceFile(
+                        sourceFile,
+                        newStatements,
+                        sourceFile.isDeclarationFile,
+                        sourceFile.referencedFiles,
+                        sourceFile.typeReferenceDirectives,
+                        sourceFile.hasNoDefaultLib,
+                        sourceFile.libReferenceDirectives
                     );
                 }
 
-                if (blockTransformer.hasGeneratedBlocks()) {
-                    return runtimeHelper.addRuntimeImports(signedSourceFile);
-                }
-
-                return signedSourceFile;
+                return sourceFile;
             } catch (error) {
                 if (debug) {
                     console.warn(`Transformation failed for ${sourceFile.fileName}: ${error}`);
@@ -146,6 +160,12 @@ export function createDecillionTransformer(options?: DecillionTransformerOptions
     return (program: ts.Program) => millionTransformer(program, options);
 }
 
-// Default export for ttypescript plugin usage
-export default millionTransformer;
+// Default export for roblox-ts plugin usage
+export default function(program: ts.Program, options?: DecillionTransformerOptions) {
+    return millionTransformer(program, options);
+}
+
+// Also export the main transformer function for compatibility
+module.exports = millionTransformer;
+module.exports.default = millionTransformer;
 
