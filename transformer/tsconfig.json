@@ -20,7 +20,6 @@
         "rootDir": "src",
 		"outDir": "out",
 		"baseUrl": "src",
-		"tsBuildInfoFile": "out/tsconfig.tsbuildinfo",
         "declaration": true
 	},
 	"include": ["src/**/*", "index.d.ts"]

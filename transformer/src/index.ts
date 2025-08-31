@@ -19,14 +19,18 @@ export interface DecillionTransformerOptions {
  * Million.js-inspired TypeScript transformer for Roblox-TS
  * Transforms JSX into highly optimized, block-memoized UI code
  */
-function transformer(
-    program: ts.Program,
-    options: DecillionTransformerOptions = {}
-): ts.TransformerFactory<ts.SourceFile> {
+export default function (program: ts.Program, options: DecillionTransformerOptions = {}) {
     const { addSignature = true, signatureMessage, debug = true } = options;
 
-    return (context: ts.TransformationContext) => {
-        return (sourceFile: ts.SourceFile) => {
+    return (context: ts.TransformationContext): ((file: ts.SourceFile) => ts.Node) => {
+        return (file: ts.SourceFile) => {
+            // Only process SourceFile nodes that contain JSX
+            if (!ts.isSourceFile(file)) {
+                return file;
+            }
+
+            const sourceFile = file;
+
             if (debug) {
                 console.log(`Decillion transformer processing: ${sourceFile.fileName}`);
             }
@@ -78,7 +82,7 @@ function transformer(
 
                 // Analyze if this is static or dynamic
                 const isStatic = isStaticCreateElementCall(props, children);
-                
+
                 if (isStatic) {
                     if (debug) {
                         console.log(`Creating static element for ${elementType}`);
@@ -128,7 +132,7 @@ function transformer(
 
             // Helper function to check if an expression is static
             const isStaticExpression = (expr: ts.Expression): boolean => {
-                if (ts.isStringLiteral(expr) || ts.isNumericLiteral(expr) || 
+                if (ts.isStringLiteral(expr) || ts.isNumericLiteral(expr) ||
                     ts.isBooleanLiteral(expr) || expr.kind === ts.SyntaxKind.NullKeyword) {
                     return true;
                 }
@@ -139,7 +143,7 @@ function transformer(
                     if (ts.isPropertyAccessExpression(callExpr)) {
                         const objName = ts.isIdentifier(callExpr.expression) ? callExpr.expression.text : "";
                         const methodName = ts.isIdentifier(callExpr.name) ? callExpr.name.text : "";
-                        
+
                         if ((objName === "Color3" && methodName === "fromRGB") ||
                             (objName === "UDim2" && methodName === "new")) {
                             // Check if all arguments are static
@@ -172,11 +176,11 @@ function transformer(
                         ts.isIdentifier(expr.name) &&
                         expr.name.text === "createElement") {
                         console.log(`Found React.createElement call`);
-                        
+
                         if (node.arguments.length > 0 && ts.isStringLiteral(node.arguments[0])) {
                             const elementType = node.arguments[0].text;
                             console.log(`Element type: ${elementType}`);
-                            
+
                             // Check if this is a Roblox UI element
                             if (elementType === "frame" || elementType === "textlabel" || elementType === "textbutton") {
                                 console.log(`Found Roblox UI element: ${elementType}`);
@@ -187,7 +191,7 @@ function transformer(
                 }
 
                 // Continue visiting children for nodes that typically have them
-                if (ts.isSourceFile(node) || 
+                if (ts.isSourceFile(node) ||
                     ts.isModuleDeclaration(node) ||
                     ts.isClassDeclaration(node) ||
                     ts.isInterfaceDeclaration(node) ||
@@ -217,11 +221,11 @@ function transformer(
 
                 // Get the source text for string-based analysis
                 const sourceText = sourceFile.getFullText();
-                
+
                 // Check if this file contains Roblox UI elements that we can optimize
-                const hasRobloxUI = sourceText.includes('<frame') || 
-                                   sourceText.includes('<textlabel') || 
-                                   sourceText.includes('<textbutton');
+                const hasRobloxUI = sourceText.includes('<frame') ||
+                    sourceText.includes('<textlabel') ||
+                    sourceText.includes('<textbutton');
 
                 if (!hasRobloxUI) {
                     if (debug) {
@@ -236,11 +240,11 @@ function transformer(
 
                 // Apply string-based transformation as a proof of concept
                 let optimizedText = sourceText;
-                
+
                 // Add the runtime import at the top of the file (after existing imports)
                 const importRegex = /(import.*from.*["'].*["'];?\s*\n)/g;
                 const imports = optimizedText.match(importRegex) || [];
-                
+
                 if (imports.length > 0) {
                     // Find the last import
                     let lastImportIndex = 0;
@@ -249,12 +253,12 @@ function transformer(
                     while ((match = regex.exec(optimizedText)) !== null) {
                         lastImportIndex = match.index + match[0].length;
                     }
-                    
+
                     const runtimeImport = `import { createStaticElement, useMemoizedBlock } from "@rbxts/decillion-runtime";\n`;
-                    optimizedText = optimizedText.slice(0, lastImportIndex) + 
-                                   runtimeImport + 
-                                   optimizedText.slice(lastImportIndex);
-                    
+                    optimizedText = optimizedText.slice(0, lastImportIndex) +
+                        runtimeImport +
+                        optimizedText.slice(lastImportIndex);
+
                     if (debug) {
                         console.log(`Added runtime import after existing imports`);
                     }
@@ -262,7 +266,7 @@ function transformer(
 
                 // Simple transformation: replace some static JSX with createStaticElement calls
                 // This is a proof of concept - in reality we'd need proper parsing
-                
+
                 // Transform static textlabel elements
                 const staticTextLabelRegex = /<textlabel\s+([^>]*Text=["']([^"']*)["'][^>]*\/?)>/g;
                 optimizedText = optimizedText.replace(staticTextLabelRegex, (match, attributes, text) => {
@@ -302,6 +306,4 @@ function transformer(
             }
         };
     };
-}
-
-export default transformer;
+};

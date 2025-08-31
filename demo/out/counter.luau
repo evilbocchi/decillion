@@ -1,8 +1,10 @@
 -- Compiled with roblox-ts v3.0.0
 local TS = _G[script]
+-- Optimized by Decillion - static elements converted to createStaticElement calls
 local _react = TS.import(script, TS.getModule(script, "@rbxts", "react"))
 local React = _react
 local useState = _react.useState
+local createStaticElement = TS.import(script, TS.getModule(script, "@rbxts", "decillion-runtime").out).createStaticElement
 local function App()
 	local count, setCount = useState(0)
 	local increment = function()
@@ -17,7 +19,7 @@ local function App()
 	}, React.createElement("frame", {
 		BackgroundColor3 = Color3.fromRGB(50, 50, 50),
 		Size = UDim2.new(1, 0, 0, 50),
-	}, React.createElement("textlabel", {
+	}, createStaticElement("textlabel", {
 		Text = "Optimized Counter App",
 		TextColor3 = Color3.fromRGB(255, 255, 255),
 		BackgroundTransparency = 1,
@@ -50,7 +52,7 @@ local function App()
 		Size = UDim2.new(1, 0, 0, 100),
 		Position = UDim2.new(0, 0, 0, 160),
 		BackgroundColor3 = Color3.fromRGB(60, 60, 60),
-	}, React.createElement("textlabel", {
+	}, createStaticElement("textlabel", {
 		Text = "Performance: Decillion Optimized",
 		TextColor3 = Color3.fromRGB(200, 200, 200),
 		BackgroundTransparency = 1,
