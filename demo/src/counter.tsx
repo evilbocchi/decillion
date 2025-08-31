@@ -1,54 +1,28 @@
 import React, { useState } from "@rbxts/react";
-import { getCacheStats, createBlock } from "@rbxts/decillion-runtime";
 
-// This will be optimized by our transformer
-export default function OptimizedApp() {
+export default function App() {
   const [count, setCount] = useState(0);
 
   const increment = () => setCount(count + 1);
   const decrement = () => setCount(count - 1);
-
-  // Demonstrate runtime optimization by showing cache stats
-  const cacheStats = getCacheStats();
-
-  // Create an optimized static block for the header
-  const renderHeader = createBlock(() => (
-    <frame
-      BackgroundColor3={Color3.fromRGB(50, 50, 50)}
-      Size={new UDim2(1, 0, 0, 50)}
-    >
-      <textlabel
-        Text="Optimized Counter App"
-        TextColor3={Color3.fromRGB(255, 255, 255)}
-        BackgroundTransparency={1}
-        Size={new UDim2(1, 0, 1, 0)}
-      />
-    </frame>
-  ));
-
-  // Create an optimized static block for the performance panel
-  const renderPerformancePanel = createBlock(() => (
-    <frame
-      Size={new UDim2(1, 0, 0, 100)}
-      Position={new UDim2(0, 0, 0, 160)}
-      BackgroundColor3={Color3.fromRGB(60, 60, 60)}
-    >
-      <textlabel
-        Text={`Performance: Decillion Optimized - Blocks: ${cacheStats.totalBlocks}, Hit Rate: ${math.floor(cacheStats.cacheHitRate * 100)}%`}
-        TextColor3={Color3.fromRGB(200, 200, 200)}
-        BackgroundTransparency={1}
-        Size={new UDim2(1, 0, 1, 0)}
-      />
-    </frame>
-  ), { blockType: "static-performance" });
 
   return (
     <frame
       Size={new UDim2(1, 0, 1, 0)}
       BackgroundColor3={Color3.fromRGB(30, 30, 30)}
     >
-      {/* Static header - now uses optimized block */}
-      {renderHeader()}
+      {/* Static header - should be completely optimized */}
+      <frame
+        BackgroundColor3={Color3.fromRGB(50, 50, 50)}
+        Size={new UDim2(1, 0, 0, 50)}
+      >
+        <textlabel
+          Text="Optimized Counter App"
+          TextColor3={Color3.fromRGB(255, 255, 255)}
+          BackgroundTransparency={1}
+          Size={new UDim2(1, 0, 1, 0)}
+        />
+      </frame>
 
       {/* Dynamic counter display - block should be memoized */}
       <textlabel
@@ -78,8 +52,19 @@ export default function OptimizedApp() {
         Event={{ MouseButton1Click: decrement }}
       />
 
-      {/* Performance info panel - optimized static block */}
-      {renderPerformancePanel()}
+      {/* Performance info panel - static block */}
+      <frame
+        Size={new UDim2(1, 0, 0, 100)}
+        Position={new UDim2(0, 0, 0, 160)}
+        BackgroundColor3={Color3.fromRGB(60, 60, 60)}
+      >
+        <textlabel
+          Text="Performance: Decillion Optimized"
+          TextColor3={Color3.fromRGB(200, 200, 200)}
+          BackgroundTransparency={1}
+          Size={new UDim2(1, 0, 1, 0)}
+        />
+      </frame>
     </frame>
   );
 }

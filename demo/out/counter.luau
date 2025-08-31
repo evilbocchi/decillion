@@ -3,11 +3,7 @@ local TS = _G[script]
 local _react = TS.import(script, TS.getModule(script, "@rbxts", "react"))
 local React = _react
 local useState = _react.useState
-local _decillion_runtime = TS.import(script, TS.getModule(script, "@rbxts", "decillion-runtime").out)
-local getCacheStats = _decillion_runtime.getCacheStats
-local createBlock = _decillion_runtime.createBlock
--- This will be optimized by our transformer
-local function OptimizedApp()
+local function App()
 	local count, setCount = useState(0)
 	local increment = function()
 		return setCount(count + 1)
@@ -15,39 +11,18 @@ local function OptimizedApp()
 	local decrement = function()
 		return setCount(count - 1)
 	end
-	-- Demonstrate runtime optimization by showing cache stats
-	local cacheStats = getCacheStats()
-	-- Create an optimized static block for the header
-	local renderHeader = createBlock(function()
-		return React.createElement("frame", {
-			BackgroundColor3 = Color3.fromRGB(50, 50, 50),
-			Size = UDim2.new(1, 0, 0, 50),
-		}, React.createElement("textlabel", {
-			Text = "Optimized Counter App",
-			TextColor3 = Color3.fromRGB(255, 255, 255),
-			BackgroundTransparency = 1,
-			Size = UDim2.new(1, 0, 1, 0),
-		}))
-	end)
-	-- Create an optimized static block for the performance panel
-	local renderPerformancePanel = createBlock(function()
-		return React.createElement("frame", {
-			Size = UDim2.new(1, 0, 0, 100),
-			Position = UDim2.new(0, 0, 0, 160),
-			BackgroundColor3 = Color3.fromRGB(60, 60, 60),
-		}, React.createElement("textlabel", {
-			Text = `Performance: Decillion Optimized - Blocks: {cacheStats.totalBlocks}, Hit Rate: {math.floor(cacheStats.cacheHitRate * 100)}%`,
-			TextColor3 = Color3.fromRGB(200, 200, 200),
-			BackgroundTransparency = 1,
-			Size = UDim2.new(1, 0, 1, 0),
-		}))
-	end, {
-		blockType = "static-performance",
-	})
 	return React.createElement("frame", {
 		Size = UDim2.new(1, 0, 1, 0),
 		BackgroundColor3 = Color3.fromRGB(30, 30, 30),
-	}, renderHeader(), React.createElement("textlabel", {
+	}, React.createElement("frame", {
+		BackgroundColor3 = Color3.fromRGB(50, 50, 50),
+		Size = UDim2.new(1, 0, 0, 50),
+	}, React.createElement("textlabel", {
+		Text = "Optimized Counter App",
+		TextColor3 = Color3.fromRGB(255, 255, 255),
+		BackgroundTransparency = 1,
+		Size = UDim2.new(1, 0, 1, 0),
+	})), React.createElement("textlabel", {
 		Text = `Count: {count}`,
 		TextColor3 = Color3.fromRGB(255, 255, 255),
 		BackgroundColor3 = Color3.fromRGB(100, 100, 100),
@@ -71,8 +46,17 @@ local function OptimizedApp()
 		Event = {
 			MouseButton1Click = decrement,
 		},
-	}), renderPerformancePanel())
+	}), React.createElement("frame", {
+		Size = UDim2.new(1, 0, 0, 100),
+		Position = UDim2.new(0, 0, 0, 160),
+		BackgroundColor3 = Color3.fromRGB(60, 60, 60),
+	}, React.createElement("textlabel", {
+		Text = "Performance: Decillion Optimized",
+		TextColor3 = Color3.fromRGB(200, 200, 200),
+		BackgroundTransparency = 1,
+		Size = UDim2.new(1, 0, 1, 0),
+	})))
 end
 return {
-	default = OptimizedApp,
+	default = App,
 }
