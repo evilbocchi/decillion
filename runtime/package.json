@@ -2,7 +2,7 @@
     "name": "@rbxts/decillion-runtime",
     "version": "0.0.0",
     "description": "A Million.js-inspired high-performance UI renderer for Roblox-TS",
-    "main": "out/index.luau",
+    "main": "out/init.luau",
     "scripts": {
         "build": "rbxtsc"
     },

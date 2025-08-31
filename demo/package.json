@@ -6,10 +6,10 @@
     },
     "dependencies": {
         "@rbxts/compiler-types": "^3.0.0-types.0",
-        "@rbxts/decillion-runtime": "file:../rbxts-decillion-runtime-0.0.0.tgz",
+        "@rbxts/decillion-runtime": "file://../runtime",
         "@rbxts/react": "^17.2.3",
         "@rbxts/types": "^1.0.879",
-        "rbxts-transformer-decillion": "file:../rbxts-transformer-decillion-0.0.0.tgz",
+        "rbxts-transformer-decillion": "file://../transformer",
         "roblox-ts": "^3.0.0"
     },
     "devDependencies": {
