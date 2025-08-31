@@ -18,11 +18,6 @@ export class BlockTransformer {
      * Transforms a JSX element into an optimized block call
      */
     transformJsxElement(node: ts.JsxElement | ts.JsxSelfClosingElement): ts.Node {
-        // For now, just return the original node to avoid transformation errors
-        // The signature will show the transformer is working
-        return node;
-        
-        /* TODO: Re-enable transformations after fixing visitor issues
         try {
             const blockInfo = this.analyzer.analyzeJsxElement(node);
 
@@ -31,13 +26,7 @@ export class BlockTransformer {
                 return this.generateStaticElement(node);
             }
 
-            // For now, skip memoized blocks and just use optimized elements
-            // TODO: Re-enable memoized blocks after debugging static blocks
-            // if (this.analyzer.shouldMemoizeBlock(blockInfo)) {
-            //     return this.generateMemoizedBlock(node, blockInfo);
-            // }
-
-            // Otherwise, use regular React.createElement but optimize children
+            // For now, just return optimized elements (no memoization yet)
             return this.generateOptimizedElement(node, blockInfo);
         } catch (error) {
             // If transformation fails, return original node as fallback
@@ -47,7 +36,6 @@ export class BlockTransformer {
             }
             return node;
         }
-        */
     }
 
     /**
