@@ -9,7 +9,7 @@
         "build:demo": "cd demo && npm run build",
         "build:runtime": "cd runtime && npm run build",
         "build:transformer": "cd transformer && npm run build",
-        "dev": "concurrently \"tsc --watch\" \"rbxtsc --watch\"",
+        "dev": "concurrently --prefix none \"cd demo && npm run dev\" \"cd runtime && npm run dev\" \"cd transformer && npm run dev\"",
         "test": "vitest",
         "lint": "eslint src --ext .ts,.tsx",
         "lint:fix": "eslint src --ext .ts,.tsx --fix",

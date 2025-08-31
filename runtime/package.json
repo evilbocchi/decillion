@@ -4,7 +4,8 @@
     "description": "A Million.js-inspired high-performance UI renderer for Roblox-TS",
     "main": "out/init.luau",
     "scripts": {
-        "build": "rbxtsc"
+        "build": "rbxtsc",
+        "dev": "rbxtsc --watch"
     },
     "repository": {
         "type": "git",

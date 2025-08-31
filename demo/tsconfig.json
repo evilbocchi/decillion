@@ -13,7 +13,7 @@
                 "noSemanticDiagnostics": true
             },
             {
-                "transform": "rbxts-transformer-decillion"
+                "transform": "../transformer/out"
             }
         ],
         "jsx": "react",

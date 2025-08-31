@@ -4,7 +4,8 @@
     "description": "A Million.js-inspired high-performance UI renderer for Roblox-TS",
     "main": "out/index.js",
     "scripts": {
-        "build": "tsc"
+        "build": "tsc",
+        "dev": "tsc --watch"
     },
     "license": "MIT",
     "repository": {
