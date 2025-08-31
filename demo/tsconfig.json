@@ -5,6 +5,14 @@
         "downlevelIteration": true,
         "plugins": [
             {
+                "transform": "rbxts-transformer-flamework",
+                "exclude": [
+                    "**/node_modules/**"
+                ],
+                "obfuscation": false,
+                "noSemanticDiagnostics": true
+            },
+            {
                 "transform": "rbxts-transformer-decillion"
             }
         ],
@@ -22,6 +30,7 @@
         "target": "ESNext",
         "typeRoots": [
             "node_modules/@rbxts",
+            "node_modules/@flamework"
         ],
         // configurable
         "rootDir": "src",

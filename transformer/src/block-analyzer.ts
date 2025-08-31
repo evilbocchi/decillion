@@ -249,7 +249,7 @@ export class BlockAnalyzer {
         }
 
         // Memoize if it has dynamic props or children and has dependencies
-        if ((blockInfo.dynamicProps.length > 0 || blockInfo.hasDynamicChildren) && 
+        if ((blockInfo.dynamicProps.length > 0 || blockInfo.hasDynamicChildren) &&
             blockInfo.dependencies.length > 0) {
             return true;
         }

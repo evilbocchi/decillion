@@ -5,11 +5,14 @@
         "build": "npx rimraf out && rbxtsc"
     },
     "dependencies": {
+        "@flamework/core": "^1.3.1",
         "@rbxts/compiler-types": "^3.0.0-types.0",
         "@rbxts/decillion-runtime": "file://../runtime",
         "@rbxts/react": "^17.2.3",
+        "@rbxts/react-roblox": "^17.2.3",
         "@rbxts/types": "^1.0.879",
         "rbxts-transformer-decillion": "file://../transformer",
+        "rbxts-transformer-flamework": "^1.3.1",
         "roblox-ts": "^3.0.0"
     },
     "devDependencies": {
