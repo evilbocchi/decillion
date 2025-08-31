@@ -2,11 +2,22 @@
 	"version": 1,
 	"flameworkVersion": "1.3.1",
 	"identifiers": {
+		"@rbxts/decillion-example:out/complex-test@ComplexFlameworkComponent": "@rbxts/decillion-example:complex-test@ComplexFlameworkComponent",
 		"@rbxts/decillion-example:out/flamework-class@FlameworkClass": "@rbxts/decillion-example:flamework-class@FlameworkClass"
 	},
 	"metadata": {},
 	"identifierPrefix": "@rbxts/decillion-example",
 	"classes": [
+		{
+			"filePath": "out/complex-test.lua",
+			"internalId": "@rbxts/decillion-example:complex-test@ComplexFlameworkComponent",
+			"decorators": [
+				{
+					"internalId": "$:flamework@Service",
+					"name": "Service"
+				}
+			]
+		},
 		{
 			"filePath": "out/flamework-class.lua",
 			"internalId": "@rbxts/decillion-example:flamework-class@FlameworkClass",
