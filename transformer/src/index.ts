@@ -129,7 +129,8 @@ function millionTransformer(
             // Helper function to check if an expression is static
             const isStaticExpression = (expr: ts.Expression): boolean => {
                 if (ts.isStringLiteral(expr) || ts.isNumericLiteral(expr) || 
-                    ts.isBooleanLiteral(expr) || expr.kind === ts.SyntaxKind.NullKeyword) {
+                    expr.kind === ts.SyntaxKind.TrueKeyword || expr.kind === ts.SyntaxKind.FalseKeyword ||
+                    expr.kind === ts.SyntaxKind.NullKeyword) {
                     return true;
                 }
 
@@ -285,8 +286,7 @@ function millionTransformer(
                     sourceFile.fileName,
                     optimizedText,
                     sourceFile.languageVersion,
-                    true,
-                    sourceFile.scriptKind
+                    true
                 );
 
                 return newSourceFile;
