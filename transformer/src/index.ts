@@ -63,9 +63,37 @@ function millionTransformer(
                         console.log(`Found Roblox UI elements in source text`);
                     }
                     
-                    // For now, let's just return the file as optimizable so runtime imports get added
-                    // We'll implement actual JSX transformation in a future iteration
-                    return { file, hasOptimizableElements: true };
+                    // Apply a simple transformation: add a comment to the top of the file
+                    const statements = file.statements;
+                    if (statements.length > 0) {
+                        const firstStatement = statements[0];
+                        
+                        // Add a leading comment to the first statement
+                        const commentedStatement = ts.addSyntheticLeadingComment(
+                            firstStatement,
+                            ts.SyntaxKind.SingleLineCommentTrivia,
+                            " Decillion: This file has been optimized",
+                            true
+                        );
+                        
+                        const newStatements = [commentedStatement, ...statements.slice(1)];
+                        
+                        const transformedFile = ts.factory.updateSourceFile(
+                            file,
+                            newStatements,
+                            file.isDeclarationFile,
+                            file.referencedFiles,
+                            file.typeReferenceDirectives,
+                            file.hasNoDefaultLib,
+                            file.libReferenceDirectives
+                        );
+                        
+                        if (debug) {
+                            console.log(`Successfully applied comment transformation`);
+                        }
+                        
+                        return { file: transformedFile, hasOptimizableElements: true };
+                    }
                 }
                 
                 if (debug) {
@@ -82,15 +110,14 @@ function millionTransformer(
                 
                 if (blockTransformer.hasGeneratedBlocks() || result.hasOptimizableElements) {
                     if (debug) {
-                        console.log(`Generated blocks or optimizable elements found, adding runtime imports`);
+                        console.log(`Generated blocks or optimizable elements found`);
                     }
-                    const fileWithImports = runtimeHelper.addRuntimeImports(optimizedSourceFile);
                     
                     if (debug) {
-                        console.log(`Transformed file content:\n${fileWithImports.getFullText()}`);
+                        console.log(`Transformed file content:\n${optimizedSourceFile.getFullText()}`);
                     }
                     
-                    return fileWithImports;
+                    return optimizedSourceFile;
                 }
 
                 if (debug) {
