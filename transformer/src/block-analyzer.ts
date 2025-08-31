@@ -248,8 +248,9 @@ export class BlockAnalyzer {
             return false;
         }
 
-        // Memoize if it has dynamic props but might benefit from skipping updates
-        if (blockInfo.dynamicProps.length > 0 || blockInfo.hasDynamicChildren) {
+        // Memoize if it has dynamic props or children and has dependencies
+        if ((blockInfo.dynamicProps.length > 0 || blockInfo.hasDynamicChildren) && 
+            blockInfo.dependencies.length > 0) {
             return true;
         }
 
