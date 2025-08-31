@@ -43,7 +43,7 @@ export class RuntimeHelper {
     addRuntimeImports(sourceFile: ts.SourceFile): ts.SourceFile {
         console.log(`[RuntimeHelper] Adding runtime imports to ${sourceFile.fileName}`);
         
-        // Create import for our runtime helpers
+        // Create the import declaration using TypeScript factory
         const runtimeImport = ts.factory.createImportDeclaration(
             undefined,
             ts.factory.createImportClause(
@@ -64,12 +64,20 @@ export class RuntimeHelper {
                         false,
                         undefined,
                         ts.factory.createIdentifier("shouldUpdateBlock")
+                    ),
+                    ts.factory.createImportSpecifier(
+                        false,
+                        undefined,
+                        ts.factory.createIdentifier("createStaticElement")
                     )
                 ])
             ),
-            ts.factory.createStringLiteral("@rbxts/decillion-runtime")
+            ts.factory.createStringLiteral("@rbxts/decillion-runtime"),
+            undefined
         );
-
+        
+        console.log(`[RuntimeHelper] Created import declaration`);
+        
         // Add the import to the beginning of the file
         const statements = [runtimeImport, ...sourceFile.statements];
         console.log(`[RuntimeHelper] Created ${statements.length} statements (was ${sourceFile.statements.length})`);

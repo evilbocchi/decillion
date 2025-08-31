@@ -21,12 +21,17 @@ export class BlockTransformer {
         try {
             const blockInfo = this.analyzer.analyzeJsxElement(node);
 
-            // If it's completely static, generate it once and return
+            // If it's completely static, generate static element
             if (blockInfo.isStatic) {
                 return this.generateStaticElement(node);
             }
 
-            // For now, just return optimized elements (no memoization yet)
+            // If it should be memoized, generate memoized block
+            if (this.analyzer.shouldMemoizeBlock(blockInfo)) {
+                return this.generateMemoizedBlock(node, blockInfo);
+            }
+
+            // Otherwise, generate optimized element  
             return this.generateOptimizedElement(node, blockInfo);
         } catch (error) {
             // If transformation fails, return original node as fallback
@@ -62,20 +67,18 @@ export class BlockTransformer {
      * Generates code for a completely static element
      */
     private generateStaticElement(node: ts.JsxElement | ts.JsxSelfClosingElement): ts.Expression {
-        // For static elements, we can cache them
+        // For static elements, we use createStaticElement for optimization
         const tagName = this.analyzer.getJsxTagName(node);
         const props = this.extractStaticProps(node);
+        const children = this.extractStaticChildren(node);
 
         return ts.factory.createCallExpression(
-            ts.factory.createPropertyAccessExpression(
-                ts.factory.createIdentifier("React"),
-                ts.factory.createIdentifier("createElement")
-            ),
+            ts.factory.createIdentifier("createStaticElement"),
             undefined,
             [
                 ts.factory.createStringLiteral(tagName),
                 props.length > 0 ? this.createPropsObject(props) : ts.factory.createNull(),
-                ...this.extractStaticChildren(node)
+                ...children
             ]
         );
     }
@@ -92,12 +95,30 @@ export class BlockTransformer {
             this.generatedBlocks.add(blockInfo.id);
         }
 
-        // Return a call to the memoized block
+        // Create a call to useMemoizedBlock with proper parameters
         return ts.factory.createCallExpression(
             ts.factory.createIdentifier("useMemoizedBlock"),
             undefined,
             [
-                ts.factory.createIdentifier(blockFunctionName),
+                // Arrow function that calls the block function
+                ts.factory.createArrowFunction(
+                    undefined,
+                    undefined,
+                    blockInfo.dependencies.map(dep =>
+                        ts.factory.createParameterDeclaration(
+                            undefined,
+                            undefined,
+                            ts.factory.createIdentifier(dep)
+                        )
+                    ),
+                    undefined,
+                    ts.factory.createToken(ts.SyntaxKind.EqualsGreaterThanToken),
+                    ts.factory.createCallExpression(
+                        ts.factory.createIdentifier(blockFunctionName),
+                        undefined,
+                        blockInfo.dependencies.map(dep => ts.factory.createIdentifier(dep))
+                    )
+                ),
                 this.createDependenciesArray(blockInfo.dependencies),
                 ts.factory.createStringLiteral(blockInfo.id)
             ]
