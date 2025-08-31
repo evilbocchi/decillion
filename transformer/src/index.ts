@@ -84,7 +84,13 @@ function millionTransformer(
                     if (debug) {
                         console.log(`Generated blocks or optimizable elements found, adding runtime imports`);
                     }
-                    return runtimeHelper.addRuntimeImports(optimizedSourceFile);
+                    const fileWithImports = runtimeHelper.addRuntimeImports(optimizedSourceFile);
+                    
+                    if (debug) {
+                        console.log(`Transformed file content:\n${fileWithImports.getFullText()}`);
+                    }
+                    
+                    return fileWithImports;
                 }
 
                 if (debug) {

@@ -43,33 +43,24 @@ export class RuntimeHelper {
     addRuntimeImports(sourceFile: ts.SourceFile): ts.SourceFile {
         console.log(`[RuntimeHelper] Adding runtime imports to ${sourceFile.fileName}`);
         
-        // Create import for our runtime helpers
-        const runtimeImport = ts.factory.createImportDeclaration(
-            undefined,
-            ts.factory.createImportClause(
-                false,
-                undefined,
-                ts.factory.createNamedImports([
-                    ts.factory.createImportSpecifier(
-                        false,
-                        undefined,
-                        ts.factory.createIdentifier("useMemoizedBlock")
-                    ),
-                    ts.factory.createImportSpecifier(
-                        false,
-                        undefined,
-                        ts.factory.createIdentifier("createBlock")
-                    ),
-                    ts.factory.createImportSpecifier(
-                        false,
-                        undefined,
-                        ts.factory.createIdentifier("shouldUpdateBlock")
-                    )
-                ])
-            ),
-            ts.factory.createStringLiteral("@rbxts/decillion-runtime")
+        // Try creating import with a different approach - use the same pattern as existing imports
+        const printer = ts.createPrinter();
+        
+        // Create the import as a simple string and parse it
+        const importText = `import { useMemoizedBlock, createBlock, shouldUpdateBlock } from "@rbxts/decillion-runtime";`;
+        console.log(`[RuntimeHelper] Creating import: ${importText}`);
+        
+        // Parse the import statement
+        const importSourceFile = ts.createSourceFile(
+            'temp.ts',
+            importText,
+            ts.ScriptTarget.Latest,
+            true
         );
-
+        
+        const runtimeImport = importSourceFile.statements[0];
+        console.log(`[RuntimeHelper] Created import node, kind: ${runtimeImport.kind}`);
+        
         // Add the import to the beginning of the file
         const statements = [runtimeImport, ...sourceFile.statements];
         console.log(`[RuntimeHelper] Created ${statements.length} statements (was ${sourceFile.statements.length})`);
