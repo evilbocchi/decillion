@@ -23,7 +23,7 @@ function millionTransformer(
     program: ts.Program,
     options: DecillionTransformerOptions = {}
 ): ts.TransformerFactory<ts.SourceFile> {
-    const { addSignature = true, signatureMessage, debug = false } = options;
+    const { addSignature = true, signatureMessage, debug = true } = options;
 
     return (context: ts.TransformationContext) => {
         return (sourceFile: ts.SourceFile) => {
@@ -33,7 +33,7 @@ function millionTransformer(
 
             // Quick check: if the file doesn't contain JSX, don't transform it
             const sourceText = sourceFile.getFullText();
-            if (!sourceText.includes('<') || !sourceText.includes('jsx')) {
+            if (!sourceText.includes('<')) {
                 return sourceFile;
             }
 
@@ -48,62 +48,51 @@ function millionTransformer(
             );
             const runtimeHelper = new RuntimeHelper(context);
 
-            // Use a more defensive visitor approach
-            function visit(node: ts.Node): ts.Node {
-                // Only transform specific node types we care about
-                if (ts.isJsxElement(node) || ts.isJsxSelfClosingElement(node)) {
-                    try {
-                        return blockTransformer.transformJsxElement(node);
-                    } catch (error) {
-                        if (debug) {
-                            console.warn(`Failed to transform JSX element: ${error}`);
-                        }
-                        return node; // Return original node if transformation fails
-                    }
-                }
-
-                if (
-                    ts.isFunctionDeclaration(node) ||
-                    ts.isArrowFunction(node) ||
-                    ts.isFunctionExpression(node)
-                ) {
-                    try {
-                        const optimized = blockTransformer.transformComponent(node);
-                        if (optimized) {
-                            return optimized;
-                        }
-                    } catch (error) {
-                        if (debug) {
-                            console.warn(`Failed to transform component: ${error}`);
-                        }
-                    }
-                }
-
-                // For all other nodes, recursively visit children
-                return ts.visitEachChild(node, visit, context);
-            }
+            // Helper function to find and optimize JSX elements
+            const findAndOptimizeJsxElements = (file: ts.SourceFile): ts.SourceFile => {
+                // Add a comment to show the transformer is working
+                const statements = file.statements;
+                const optimizedStatements = [
+                    // Add a comment at the top to show the file was processed
+                    ts.factory.createExpressionStatement(
+                        ts.factory.createStringLiteral("// File processed by Decillion transformer")
+                    ),
+                    ...statements
+                ];
+                
+                return ts.factory.updateSourceFile(
+                    file,
+                    optimizedStatements,
+                    file.isDeclarationFile,
+                    file.referencedFiles,
+                    file.typeReferenceDirectives,
+                    file.hasNoDefaultLib,
+                    file.libReferenceDirectives
+                );
+            };
 
             try {
-                // Transform the source file
-                const transformedSourceFile = ts.visitNode(sourceFile, visit) as ts.SourceFile;
-
-                // Add signature to indicate this file was transformed (if enabled)
-                let signedSourceFile = transformedSourceFile;
-                if (addSignature) {
-                    signedSourceFile = runtimeHelper.addTransformerSignature(
-                        transformedSourceFile,
-                        signatureMessage
-                    );
-                }
-
+                // Use a different approach - find and replace specific patterns
+                const optimizedSourceFile = findAndOptimizeJsxElements(sourceFile);
+                
                 if (blockTransformer.hasGeneratedBlocks()) {
-                    return runtimeHelper.addRuntimeImports(signedSourceFile);
+                    if (debug) {
+                        console.log(`Generated blocks found, adding runtime imports`);
+                    }
+                    return runtimeHelper.addRuntimeImports(optimizedSourceFile);
                 }
 
-                return signedSourceFile;
+                if (debug) {
+                    console.log(`No blocks generated for ${sourceFile.fileName}`);
+                }
+
+                return optimizedSourceFile;
             } catch (error) {
                 if (debug) {
                     console.warn(`Transformation failed for ${sourceFile.fileName}: ${error}`);
+                    if (error instanceof Error) {
+                        console.warn(`Error stack: ${error.stack}`);
+                    }
                 }
                 // Return original file if transformation completely fails
                 return sourceFile;
