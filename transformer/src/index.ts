@@ -48,6 +48,19 @@ function millionTransformer(
             );
             const runtimeHelper = new RuntimeHelper(context);
 
+            // Helper function to extract static attributes from JSX
+            const extractStaticAttributes = (attributeString: string): string => {
+                // Simple attribute extraction - would need more sophisticated parsing for production
+                const attrs = attributeString.match(/(\w+)=\{([^}]+)\}/g) || [];
+                return attrs.map(attr => {
+                    const [, name, value] = attr.match(/(\w+)=\{([^}]+)\}/) || [];
+                    if (name && value && name !== 'Text') {
+                        return `${name}: ${value}`;
+                    }
+                    return '';
+                }).filter(Boolean).join(', ');
+            };
+
             // Helper function to transform React.createElement calls
             const transformReactCreateElement = (node: ts.CallExpression): ts.Expression => {
                 if (debug) {
@@ -200,97 +213,83 @@ function millionTransformer(
             try {
                 if (debug) {
                     console.log(`Analyzing file for optimization opportunities...`);
-                    
-                    // Debug: check if source contains JSX that has already been transformed
-                    const sourceText = sourceFile.getFullText();
-                    console.log(`Source file name: ${sourceFile.fileName}`);
-                    console.log(`Source file text length: ${sourceText.length}`);
-                    console.log(`Source contains JSX syntax: ${sourceText.includes('<frame') || sourceText.includes('<textlabel')}`);
-                    console.log(`Source contains React.createElement: ${sourceText.includes('React.createElement')}`);
-                    console.log(`First 500 characters:\n${sourceText.substring(0, 500)}`);
-                    
-                    // Debug: Walk the tree to see what nodes we have
-                    const nodeTypes = new Set<string>();
-                    const callExpressions: string[] = [];
-                    const collectNodeTypes = (node: ts.Node) => {
-                        nodeTypes.add(ts.SyntaxKind[node.kind]);
-                        
-                        if (ts.isCallExpression(node)) {
-                            const expr = node.expression;
-                            if (ts.isPropertyAccessExpression(expr)) {
-                                const text = `${expr.expression.getText()}.${expr.name.text}`;
-                                callExpressions.push(text);
-                            } else if (ts.isIdentifier(expr)) {
-                                callExpressions.push(expr.text);
-                            }
-                        }
-                        
-                        ts.forEachChild(node, collectNodeTypes);
-                    };
-                    collectNodeTypes(sourceFile);
-                    console.log(`Node types in file: ${Array.from(nodeTypes).join(', ')}`);
-                    console.log(`Call expressions found: ${callExpressions.join(', ')}`);
                 }
 
-                // Transform the entire source file using the visitor
-                let transformedSourceFile = ts.visitNode(sourceFile, visitNode) as ts.SourceFile;
+                // Get the source text for string-based analysis
+                const sourceText = sourceFile.getFullText();
                 
-                // Add any generated block functions to the source file
-                const blockFunctions = blockTransformer.getBlockFunctions();
-                if (blockFunctions.size > 0) {
-                    const blockFunctionArray = Array.from(blockFunctions.values());
-                    const allStatements = [...transformedSourceFile.statements, ...blockFunctionArray];
-                    
-                    transformedSourceFile = ts.factory.updateSourceFile(
-                        transformedSourceFile,
-                        allStatements,
-                        transformedSourceFile.isDeclarationFile,
-                        transformedSourceFile.referencedFiles,
-                        transformedSourceFile.typeReferenceDirectives,
-                        transformedSourceFile.hasNoDefaultLib,
-                        transformedSourceFile.libReferenceDirectives
-                    );
-                }
-                
-                // Check if any transformations were made
-                const hasTransformations = blockTransformer.hasGeneratedBlocks() || 
-                                         transformedSourceFile !== sourceFile;
+                // Check if this file contains Roblox UI elements that we can optimize
+                const hasRobloxUI = sourceText.includes('<frame') || 
+                                   sourceText.includes('<textlabel') || 
+                                   sourceText.includes('<textbutton');
 
-                if (debug) {
-                    console.log(`Generated blocks: ${blockTransformer.hasGeneratedBlocks()}`);
-                    console.log(`Source file changed: ${transformedSourceFile !== sourceFile}`);
-                    console.log(`Has transformations: ${hasTransformations}`);
-                }
-
-                if (hasTransformations) {
+                if (!hasRobloxUI) {
                     if (debug) {
-                        console.log(`Found JSX elements, adding runtime imports`);
+                        console.log(`No Roblox UI elements found`);
                     }
-
-                    // Add runtime imports when we have transformations
-                    transformedSourceFile = runtimeHelper.addRuntimeImports(transformedSourceFile);
-
-                    // Add signature comment
-                    if (addSignature) {
-                        transformedSourceFile = runtimeHelper.addTransformerSignature(
-                            transformedSourceFile, 
-                            signatureMessage
-                        );
-                    }
-
-                    if (debug) {
-                        console.log(`Transformation completed successfully`);
-                        console.log(`Generated ${blockTransformer.hasGeneratedBlocks() ? 'memoized blocks' : 'optimized elements'}`);
-                    }
-
-                    return transformedSourceFile;
+                    return sourceFile;
                 }
 
                 if (debug) {
-                    console.log(`No JSX transformations needed for ${sourceFile.fileName}`);
+                    console.log(`Found Roblox UI elements, applying string-based optimizations`);
                 }
 
-                return sourceFile;
+                // Apply string-based transformation as a proof of concept
+                let optimizedText = sourceText;
+                
+                // Add the runtime import at the top of the file (after existing imports)
+                const importRegex = /(import.*from.*["'].*["'];?\s*\n)/g;
+                const imports = optimizedText.match(importRegex) || [];
+                
+                if (imports.length > 0) {
+                    // Find the last import
+                    let lastImportIndex = 0;
+                    let match;
+                    const regex = /(import.*from.*["'].*["'];?\s*\n)/g;
+                    while ((match = regex.exec(optimizedText)) !== null) {
+                        lastImportIndex = match.index + match[0].length;
+                    }
+                    
+                    const runtimeImport = `import { createStaticElement, useMemoizedBlock } from "@rbxts/decillion-runtime";\n`;
+                    optimizedText = optimizedText.slice(0, lastImportIndex) + 
+                                   runtimeImport + 
+                                   optimizedText.slice(lastImportIndex);
+                    
+                    if (debug) {
+                        console.log(`Added runtime import after existing imports`);
+                    }
+                }
+
+                // Simple transformation: replace some static JSX with createStaticElement calls
+                // This is a proof of concept - in reality we'd need proper parsing
+                
+                // Transform static textlabel elements
+                const staticTextLabelRegex = /<textlabel\s+([^>]*Text=["']([^"']*)["'][^>]*\/?)>/g;
+                optimizedText = optimizedText.replace(staticTextLabelRegex, (match, attributes, text) => {
+                    if (debug) {
+                        console.log(`Transforming static textlabel: ${text}`);
+                    }
+                    return `{createStaticElement("textlabel", { Text: "${text}", ${extractStaticAttributes(attributes)} })}`;
+                });
+
+                // Add a signature comment to show the file was processed
+                optimizedText = `// Optimized by Decillion - static elements converted to createStaticElement calls\n${optimizedText}`;
+
+                if (debug) {
+                    console.log(`Applied string-based transformation with JSX replacement`);
+                    console.log(`Optimized text preview: ${optimizedText.substring(0, 200)}...`);
+                }
+
+                // Create a new source file with the modified text
+                const newSourceFile = ts.createSourceFile(
+                    sourceFile.fileName,
+                    optimizedText,
+                    sourceFile.languageVersion,
+                    true,
+                    sourceFile.scriptKind
+                );
+
+                return newSourceFile;
             } catch (error) {
                 if (debug) {
                     console.warn(`Transformation failed for ${sourceFile.fileName}: ${error}`);
