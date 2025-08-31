@@ -133,7 +133,8 @@ export default function (program: ts.Program, options: DecillionTransformerOptio
             // Helper function to check if an expression is static
             const isStaticExpression = (expr: ts.Expression): boolean => {
                 if (ts.isStringLiteral(expr) || ts.isNumericLiteral(expr) ||
-                    ts.isBooleanLiteral(expr) || expr.kind === ts.SyntaxKind.NullKeyword) {
+                    (expr.kind === ts.SyntaxKind.TrueKeyword || expr.kind === ts.SyntaxKind.FalseKeyword) || 
+                    expr.kind === ts.SyntaxKind.NullKeyword) {
                     return true;
                 }
 
@@ -290,7 +291,7 @@ export default function (program: ts.Program, options: DecillionTransformerOptio
                     optimizedText,
                     sourceFile.languageVersion,
                     true,
-                    sourceFile.scriptKind
+                    ts.ScriptKind.TSX
                 );
 
                 return newSourceFile;
