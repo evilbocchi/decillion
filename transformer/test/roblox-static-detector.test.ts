@@ -29,6 +29,8 @@ describe('RobloxStaticDetector', () => {
             getNewLine: () => '\n',
             getDefaultLibFileName: () => 'lib.d.ts'
         });
+
+        robloxStaticDetector.initialize(program);
     });
 
     function createCallExpression(code: string): ts.CallExpression | undefined {

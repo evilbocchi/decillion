@@ -10,12 +10,16 @@ class RobloxStaticDetector {
     private staticMethods = new Map<string, Set<string>>();
     private staticProperties = new Map<string, Set<string>>();
     private initialized = false;
+    private visitedFiles = new Set<string>();
 
     /**
      * Initialize the detector by parsing roblox.d.ts and all referenced files
      */
     initialize(program: ts.Program): void {
         if (this.initialized) return;
+
+        // Clear visited files cache for fresh initialization
+        this.visitedFiles.clear();
 
         const resolved = this.resolveRobloxDTs(program);
         if (!resolved) {
@@ -26,6 +30,7 @@ class RobloxStaticDetector {
         if (!robloxDTs) {
             throw new Error('Could not create source file for roblox.d.ts');
         }
+        
 
         // Parse the main roblox.d.ts file
         this.parseRbxtsDts(robloxDTs);
@@ -33,55 +38,16 @@ class RobloxStaticDetector {
         // Parse all referenced files
         this.parseReferencedFiles(robloxDTs);
 
-        console.log(this.staticConstructors);
-
         this.initialized = true;
     }
 
     private resolveRobloxDTs(program: ts.Program): ts.ResolvedModuleFull | undefined {
-        // Try multiple resolution strategies
-        const strategies = [
-            () => ts.resolveModuleName(
-                '@rbxts/types',
-                program.getCurrentDirectory(),
-                program.getCompilerOptions(),
-                ts.sys
-            ).resolvedModule,
-            
-            () => ts.resolveModuleName(
-                '@rbxts/types',
-                program.getCompilerOptions().baseUrl || process.cwd(),
-                program.getCompilerOptions(),
-                ts.sys
-            ).resolvedModule,
-            
-            // Try to find it relative to this file's location
-            () => {
-                const thisDir = __dirname;
-                const typesPath = path.resolve(thisDir, '../node_modules/@rbxts/types/include/roblox.d.ts');
-                if (fs.existsSync(typesPath)) {
-                    return {
-                        resolvedFileName: typesPath,
-                        extension: ts.Extension.Dts,
-                        isExternalLibraryImport: true
-                    } as ts.ResolvedModuleFull;
-                }
-                return undefined;
-            }
-        ];
-
-        for (const strategy of strategies) {
-            try {
-                const result = strategy();
-                if (result) {
-                    return result;
-                }
-            } catch (e) {
-                // Continue to next strategy
-            }
-        }
-
-        return undefined;
+        return ts.resolveModuleName(
+            '@rbxts/types',
+            program.getCurrentDirectory(),
+            program.getCompilerOptions(),
+            ts.sys
+        ).resolvedModule;
     }
 
     /**
@@ -89,17 +55,28 @@ class RobloxStaticDetector {
      */
     private parseReferencedFiles(sourceFile: ts.SourceFile): void {
         const baseDir = path.dirname(sourceFile.fileName);
+
+        // Normalize the file path to prevent duplicate processing
+        const normalizedPath = path.resolve(sourceFile.fileName);
         
+        // Skip if we've already visited this file to prevent circular references
+        if (this.visitedFiles.has(normalizedPath)) {
+            return;
+        }
+        
+        // Mark this file as visited
+        this.visitedFiles.add(normalizedPath);
+
         // Extract reference paths from the source file
         const referencePaths = this.extractReferenceDirectives(sourceFile);
-        
+
         for (const refPath of referencePaths) {
             const resolvedPath = path.resolve(baseDir, refPath);
             const referencedFile = this.createSourceFileFromPath(resolvedPath);
-            
+
             if (referencedFile) {
                 this.parseRbxtsDts(referencedFile);
-                
+
                 // Recursively parse any references in the referenced file
                 this.parseReferencedFiles(referencedFile);
             }
@@ -112,15 +89,15 @@ class RobloxStaticDetector {
     private extractReferenceDirectives(sourceFile: ts.SourceFile): string[] {
         const referencePaths: string[] = [];
         const fullText = sourceFile.getFullText();
-        
+
         // Match triple-slash reference directives
         const referenceRegex = /\/\/\/\s*<reference\s+path="([^"]+)"\s*\/>/g;
         let match;
-        
+
         while ((match = referenceRegex.exec(fullText)) !== null) {
             referencePaths.push(match[1]);
         }
-        
+
         return referencePaths;
     }
 

@@ -24,8 +24,8 @@ export class BlockAnalyzer {
         private program?: ts.Program
     ) {
         // Initialize the Roblox static detector
-        if (this.program) {
-            robloxStaticDetector.initialize(this.program);
+        if (program) {
+            robloxStaticDetector.initialize(program);
         }
     }
 
