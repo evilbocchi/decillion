@@ -103,6 +103,53 @@ export class BlockTransformer {
             this.generatedBlocks.add(blockInfo.id);
         }
 
+        // Create parameters with proper type annotations for the arrow function
+        const arrowFunctionParams = blockInfo.dependencies.map(dep => {
+            let typeNode: ts.TypeNode | undefined;
+            
+            // Common Roblox types we can infer
+            if (dep === 'Color3') {
+                typeNode = ts.factory.createTypeReferenceNode(
+                    ts.factory.createIdentifier('Color3Constructor'),
+                    undefined
+                );
+            } else if (dep === 'UDim2') {
+                typeNode = ts.factory.createTypeReferenceNode(
+                    ts.factory.createIdentifier('UDim2Constructor'),
+                    undefined
+                );
+            } else if (dep === 'Vector2' || dep === 'Vector3') {
+                typeNode = ts.factory.createTypeReferenceNode(
+                    ts.factory.createIdentifier(dep + 'Constructor'),
+                    undefined
+                );
+            } else if (dep.includes('count') || dep.includes('number') || dep.includes('size') || dep.includes('position')) {
+                typeNode = ts.factory.createKeywordTypeNode(ts.SyntaxKind.NumberKeyword);
+            } else if (dep.includes('text') || dep.includes('name') || dep.includes('title')) {
+                typeNode = ts.factory.createKeywordTypeNode(ts.SyntaxKind.StringKeyword);
+            } else if (dep.includes('visible') || dep.includes('enabled') || dep.includes('active')) {
+                typeNode = ts.factory.createKeywordTypeNode(ts.SyntaxKind.BooleanKeyword);
+            } else if (dep.includes('ment') || dep.includes('click') || dep.includes('handler') || dep.endsWith('ment') || dep.includes('callback')) {
+                // Function dependencies (event handlers like increment, decrement)
+                typeNode = ts.factory.createFunctionTypeNode(
+                    undefined,
+                    [],
+                    ts.factory.createKeywordTypeNode(ts.SyntaxKind.VoidKeyword)
+                );
+            } else {
+                typeNode = ts.factory.createKeywordTypeNode(ts.SyntaxKind.AnyKeyword);
+            }
+            
+            return ts.factory.createParameterDeclaration(
+                undefined,
+                undefined,
+                ts.factory.createIdentifier(dep),
+                undefined,
+                typeNode,
+                undefined
+            );
+        });
+
         // Create a call to useMemoizedBlock with proper parameters
         return ts.factory.createCallExpression(
             ts.factory.createIdentifier("useMemoizedBlock"),
@@ -112,13 +159,7 @@ export class BlockTransformer {
                 ts.factory.createArrowFunction(
                     undefined,
                     undefined,
-                    blockInfo.dependencies.map(dep =>
-                        ts.factory.createParameterDeclaration(
-                            undefined,
-                            undefined,
-                            ts.factory.createIdentifier(dep)
-                        )
-                    ),
+                    arrowFunctionParams,
                     undefined,
                     ts.factory.createToken(ts.SyntaxKind.EqualsGreaterThanToken),
                     ts.factory.createCallExpression(
@@ -172,17 +213,57 @@ export class BlockTransformer {
         const props = this.extractAllProps(node);
         const children = this.extractOptimizedChildren(node);
 
-        // Create parameters for dependencies
-        const parameters = blockInfo.dependencies.map(dep =>
-            ts.factory.createParameterDeclaration(
+        // Create parameters for dependencies with proper type annotations
+        const parameters = blockInfo.dependencies.map(dep => {
+            // Infer type from the dependency name or use 'any' as fallback
+            let typeNode: ts.TypeNode | undefined;
+            
+            // Common Roblox types we can infer
+            if (dep === 'Color3') {
+                typeNode = ts.factory.createTypeReferenceNode(
+                    ts.factory.createIdentifier('Color3Constructor'),
+                    undefined
+                );
+            } else if (dep === 'UDim2') {
+                typeNode = ts.factory.createTypeReferenceNode(
+                    ts.factory.createIdentifier('UDim2Constructor'),
+                    undefined
+                );
+            } else if (dep === 'Vector2' || dep === 'Vector3') {
+                typeNode = ts.factory.createTypeReferenceNode(
+                    ts.factory.createIdentifier(dep + 'Constructor'),
+                    undefined
+                );
+            } else if (dep.includes('count') || dep.includes('number') || dep.includes('size') || dep.includes('position')) {
+                // Numeric dependencies
+                typeNode = ts.factory.createKeywordTypeNode(ts.SyntaxKind.NumberKeyword);
+            } else if (dep.includes('text') || dep.includes('name') || dep.includes('title')) {
+                // String dependencies
+                typeNode = ts.factory.createKeywordTypeNode(ts.SyntaxKind.StringKeyword);
+            } else if (dep.includes('visible') || dep.includes('enabled') || dep.includes('active')) {
+                // Boolean dependencies
+                typeNode = ts.factory.createKeywordTypeNode(ts.SyntaxKind.BooleanKeyword);
+            } else if (dep.includes('ment') || dep.includes('click') || dep.includes('handler') || dep.endsWith('ment') || dep.includes('callback')) {
+                // Function dependencies (event handlers like increment, decrement)
+                typeNode = ts.factory.createFunctionTypeNode(
+                    undefined,
+                    [],
+                    ts.factory.createKeywordTypeNode(ts.SyntaxKind.VoidKeyword)
+                );
+            } else {
+                // For other dependencies, try to infer from context or use any
+                typeNode = ts.factory.createKeywordTypeNode(ts.SyntaxKind.AnyKeyword);
+            }
+            
+            return ts.factory.createParameterDeclaration(
                 undefined,
                 undefined,
                 ts.factory.createIdentifier(dep),
                 undefined,
-                undefined,
+                typeNode,
                 undefined
-            )
-        );
+            );
+        });
 
         // Create the block function body
         const blockBody = ts.factory.createBlock([

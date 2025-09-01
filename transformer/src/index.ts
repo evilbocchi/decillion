@@ -195,6 +195,16 @@ export default function (program: ts.Program, options: DecillionTransformerOptio
                     expr.properties.forEach(prop => {
                         if (ts.isPropertyAssignment(prop)) {
                             extractDependenciesFromExpression(prop.initializer, deps);
+                        } else if (ts.isShorthandPropertyAssignment(prop)) {
+                            // For shorthand properties like { increment }, the identifier is the value
+                            deps.push(prop.name.text);
+                        } else if (ts.isMethodDeclaration(prop)) {
+                            // Method declarations might contain dependencies in their body
+                            ts.forEachChild(prop, child => {
+                                if (ts.isExpression(child)) {
+                                    extractDependenciesFromExpression(child, deps);
+                                }
+                            });
                         }
                     });
                     return;
@@ -261,17 +271,58 @@ export default function (program: ts.Program, options: DecillionTransformerOptio
                         // Create a block function for this dynamic element
                         const blockId = `dynamic_${elementType}_${Math.random().toString(36).substr(2, 9)}`;
                         
+                        // Create parameters with proper type annotations
+                        const arrowFunctionParams = dependencies.map((dep: string) => {
+                            let typeNode: ts.TypeNode | undefined;
+                            
+                            // Common Roblox types we can infer
+                            if (dep === 'Color3') {
+                                typeNode = ts.factory.createTypeReferenceNode(
+                                    ts.factory.createIdentifier('Color3Constructor'),
+                                    undefined
+                                );
+                            } else if (dep === 'UDim2') {
+                                typeNode = ts.factory.createTypeReferenceNode(
+                                    ts.factory.createIdentifier('UDim2Constructor'),
+                                    undefined
+                                );
+                            } else if (dep === 'Vector2' || dep === 'Vector3') {
+                                typeNode = ts.factory.createTypeReferenceNode(
+                                    ts.factory.createIdentifier(dep + 'Constructor'),
+                                    undefined
+                                );
+                            } else if (dep.includes('count') || dep.includes('number') || dep.includes('size') || dep.includes('position')) {
+                                typeNode = ts.factory.createKeywordTypeNode(ts.SyntaxKind.NumberKeyword);
+                            } else if (dep.includes('text') || dep.includes('name') || dep.includes('title')) {
+                                typeNode = ts.factory.createKeywordTypeNode(ts.SyntaxKind.StringKeyword);
+                            } else if (dep.includes('visible') || dep.includes('enabled') || dep.includes('active')) {
+                                typeNode = ts.factory.createKeywordTypeNode(ts.SyntaxKind.BooleanKeyword);
+                            } else if (dep.includes('ment') || dep.includes('click') || dep.includes('handler') || dep.endsWith('ment') || dep.includes('callback')) {
+                                // Function dependencies (event handlers like increment, decrement)
+                                typeNode = ts.factory.createFunctionTypeNode(
+                                    undefined,
+                                    [],
+                                    ts.factory.createKeywordTypeNode(ts.SyntaxKind.VoidKeyword)
+                                );
+                            } else {
+                                typeNode = ts.factory.createKeywordTypeNode(ts.SyntaxKind.AnyKeyword);
+                            }
+                            
+                            return ts.factory.createParameterDeclaration(
+                                undefined,
+                                undefined,
+                                ts.factory.createIdentifier(dep),
+                                undefined,
+                                typeNode,
+                                undefined
+                            );
+                        });
+                        
                         // Create the block function
                         const blockFunction = ts.factory.createArrowFunction(
                             undefined,
                             undefined,
-                            dependencies.map((dep: string) => 
-                                ts.factory.createParameterDeclaration(
-                                    undefined,
-                                    undefined,
-                                    ts.factory.createIdentifier(dep)
-                                )
-                            ),
+                            arrowFunctionParams,
                             undefined,
                             ts.factory.createToken(ts.SyntaxKind.EqualsGreaterThanToken),
                             node // Return the original createElement call

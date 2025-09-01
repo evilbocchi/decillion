@@ -145,6 +145,10 @@ export class BlockAnalyzer {
             return expr.properties.some(prop => {
                 if (ts.isPropertyAssignment(prop)) {
                     return this.isDynamicExpression(prop.initializer);
+                } else if (ts.isShorthandPropertyAssignment(prop)) {
+                    return true; // Shorthand props are dynamic by definition
+                } else if (ts.isMethodDeclaration(prop)) {
+                    return true; // Methods are dynamic
                 }
                 return false;
             });
@@ -203,6 +207,34 @@ export class BlockAnalyzer {
             this.extractDependencies(expr.condition, deps);
             this.extractDependencies(expr.whenTrue, deps);
             this.extractDependencies(expr.whenFalse, deps);
+            return;
+        }
+
+        if (ts.isObjectLiteralExpression(expr)) {
+            expr.properties.forEach(prop => {
+                if (ts.isPropertyAssignment(prop)) {
+                    this.extractDependencies(prop.initializer, deps);
+                } else if (ts.isShorthandPropertyAssignment(prop)) {
+                    // For shorthand properties like { increment }, the identifier is the value
+                    deps.push(prop.name.text);
+                } else if (ts.isMethodDeclaration(prop)) {
+                    // Method declarations might contain dependencies in their body
+                    ts.forEachChild(prop, child => {
+                        if (ts.isExpression(child)) {
+                            this.extractDependencies(child, deps);
+                        }
+                    });
+                }
+            });
+            return;
+        }
+
+        if (ts.isArrayLiteralExpression(expr)) {
+            expr.elements.forEach(el => {
+                if (ts.isExpression(el)) {
+                    this.extractDependencies(el, deps);
+                }
+            });
             return;
         }
 
