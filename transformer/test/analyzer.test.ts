@@ -6,6 +6,7 @@ describe('BlockAnalyzer', () => {
     let analyzer: BlockAnalyzer;
     let typeChecker: ts.TypeChecker;
     let context: ts.TransformationContext;
+    let program: ts.Program;
 
     beforeEach(() => {
         // Create a minimal TypeScript program for testing
@@ -17,7 +18,7 @@ describe('BlockAnalyzer', () => {
             ts.ScriptKind.TSX
         );
         
-        const program = ts.createProgram(['test.tsx'], {}, {
+        program = ts.createProgram(['test.tsx'], {}, {
             getSourceFile: () => sourceFile,
             writeFile: () => {},
             getCurrentDirectory: () => '',
@@ -32,7 +33,7 @@ describe('BlockAnalyzer', () => {
 
         typeChecker = program.getTypeChecker();
         context = {} as ts.TransformationContext;
-        analyzer = new BlockAnalyzer(typeChecker, context);
+        analyzer = new BlockAnalyzer(typeChecker, context, program);
     });
 
     function createJsxElement(tagName: string, props: Record<string, any> = {}): ts.JsxSelfClosingElement {

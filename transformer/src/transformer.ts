@@ -9,6 +9,7 @@ import {
     generateStaticPropsId
 } from "./codegen";
 import type { OptimizationContext, PropInfo, TransformResult } from "./types";
+import { robloxStaticDetector } from "./roblox-static-detector";
 
 /**
  * Creates the appropriate tag reference for React.createElement
@@ -332,28 +333,10 @@ function isStaticExpression(expr: ts.Expression): boolean {
     }
 
     if (ts.isCallExpression(expr)) {
-        const callExpr = expr.expression;
-        // Allow certain known static calls (like Color3.fromRGB, UDim2.new, Vector2.new)
-        if (ts.isPropertyAccessExpression(callExpr)) {
-            const objName = ts.isIdentifier(callExpr.expression) ? callExpr.expression.text : "";
-            const methodName = ts.isIdentifier(callExpr.name) ? callExpr.name.text : "";
-
-            if ((objName === "Color3" && (methodName === "fromRGB" || methodName === "new")) ||
-                (objName === "UDim2" && methodName === "new") ||
-                (objName === "Vector2" && methodName === "new") ||
-                (objName === "Vector3" && methodName === "new")) {
-                // Check if all arguments are static
-                return expr.arguments.every(arg => isStaticExpression(arg as ts.Expression));
-            }
-        }
-
-        // Allow new expressions for Roblox constructors
-        if (ts.isIdentifier(callExpr)) {
-            const constructorName = callExpr.text;
-            if (constructorName === "Color3" || constructorName === "UDim2" ||
-                constructorName === "Vector2" || constructorName === "Vector3") {
-                return expr.arguments.every(arg => isStaticExpression(arg as ts.Expression));
-            }
+        // Use the Roblox static detector for more comprehensive detection
+        if (robloxStaticDetector.isStaticRobloxCall(expr)) {
+            // Check if all arguments are static
+            return expr.arguments.every(arg => isStaticExpression(arg as ts.Expression));
         }
 
         return false;
@@ -361,12 +344,9 @@ function isStaticExpression(expr: ts.Expression): boolean {
 
     // Handle new expressions (new Color3(), new Vector2(), etc.)
     if (ts.isNewExpression(expr)) {
-        if (ts.isIdentifier(expr.expression)) {
-            const constructorName = expr.expression.text;
-            if (constructorName === "Color3" || constructorName === "UDim2" ||
-                constructorName === "Vector2" || constructorName === "Vector3") {
-                return expr.arguments ? expr.arguments.every(arg => isStaticExpression(arg as ts.Expression)) : true;
-            }
+        // Use the Roblox static detector
+        if (robloxStaticDetector.isStaticRobloxNew(expr)) {
+            return expr.arguments ? expr.arguments.every(arg => isStaticExpression(arg as ts.Expression)) : true;
         }
         return false;
     }
