@@ -133,10 +133,7 @@ class RobloxStaticDetector {
                 const typeName = node.name?.text;
                 if (!typeName) return;
 
-                // Check if this looks like a Roblox data type
-                if (this.isRobloxDataType(typeName)) {
-                    this.parseDataTypeMembers(node, typeName);
-                }
+                this.parseDataTypeMembers(node, typeName);
             }
 
             // Look for namespace declarations (like Enum)
@@ -154,15 +151,6 @@ class RobloxStaticDetector {
     }
 
     /**
-     * Check if a type name looks like a Roblox data type
-     */
-    private isRobloxDataType(typeName: string): boolean {
-        // Common Roblox data types that have constructors
-        const dataTypePattern = /^(Color3|Vector[23]|Vector[23]int16|UDim2?|CFrame|Ray|Region3|BrickColor|NumberRange|ColorSequence|NumberSequence|PathWaypoint|TweenInfo|Random|DateTime|Font|Axes|Faces|FloatCurveKey|NumberSequenceKeypoint|ColorSequenceKeypoint|DockWidgetPluginGuiInfo|CatalogSearchParams|Content)$/;
-        return dataTypePattern.test(typeName);
-    }
-
-    /**
      * Parse members of a data type interface/class
      */
     private parseDataTypeMembers(node: ts.InterfaceDeclaration | ts.ClassDeclaration, typeName: string): void {
@@ -173,29 +161,20 @@ class RobloxStaticDetector {
                 const memberName = member.name && ts.isIdentifier(member.name) ? member.name.text : undefined;
                 if (!memberName) continue;
 
-                // Check if it's a static method
-                const isStatic = member.modifiers?.some(mod => mod.kind === ts.SyntaxKind.StaticKeyword);
-
-                if (isStatic) {
-                    if (!this.staticMethods.has(typeName)) {
-                        this.staticMethods.set(typeName, new Set());
-                    }
-                    this.staticMethods.get(typeName)!.add(memberName);
+                if (!this.staticMethods.has(typeName)) {
+                    this.staticMethods.set(typeName, new Set());
                 }
+                this.staticMethods.get(typeName)!.add(memberName);
             }
 
             if (ts.isPropertySignature(member) || ts.isPropertyDeclaration(member)) {
                 const memberName = member.name && ts.isIdentifier(member.name) ? member.name.text : undefined;
                 if (!memberName) continue;
 
-                const isStatic = member.modifiers?.some(mod => mod.kind === ts.SyntaxKind.StaticKeyword);
-
-                if (isStatic) {
-                    if (!this.staticProperties.has(typeName)) {
-                        this.staticProperties.set(typeName, new Set());
-                    }
-                    this.staticProperties.get(typeName)!.add(memberName);
+                if (!this.staticProperties.has(typeName)) {
+                    this.staticProperties.set(typeName, new Set());
                 }
+                this.staticProperties.get(typeName)!.add(memberName);
             }
         }
 
