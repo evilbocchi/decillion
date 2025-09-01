@@ -64,7 +64,13 @@ export default function (program: ts.Program, options: DecillionTransformerOptio
                     }
                     
                     needsRuntimeImport = true;
-                    return blockTransformer.transformJsxElement(node) as ts.Node;
+                    const transformed = blockTransformer.transformJsxElement(node);
+                    
+                    if (debug) {
+                        console.log(`JSX element transformed successfully`);
+                    }
+                    
+                    return transformed as ts.Node;
                 }
 
                 // Transform React.createElement calls
@@ -87,22 +93,128 @@ export default function (program: ts.Program, options: DecillionTransformerOptio
                             const robloxUIElements = ['frame', 'textlabel', 'textbutton', 'scrollingframe', 'imagelabel', 'imagebutton'];
                             if (robloxUIElements.includes(elementType.toLowerCase())) {
                                 needsRuntimeImport = true;
-                                return transformReactCreateElement(node);
+                                const transformed = transformReactCreateElement(node);
+                                if (debug) {
+                                    console.log(`Transformed ${elementType} createElement call`);
+                                }
+                                return transformed;
+                            } else {
+                                if (debug) {
+                                    console.log(`Skipping non-Roblox element: ${elementType}`);
+                                }
+                            }
+                        } else {
+                            if (debug) {
+                                console.log(`Found React.createElement call but first argument is not string literal`);
                             }
                         }
                     }
                 }
 
-                // Transform function components
-                if (ts.isFunctionDeclaration(node) || ts.isArrowFunction(node) || ts.isFunctionExpression(node)) {
-                    const transformedComponent = blockTransformer.transformComponent(node);
+                // Transform function components - visit children first, then transform the function
+                const visited = ts.visitEachChild(node, visitNode, context);
+
+                if (ts.isFunctionDeclaration(visited) || ts.isArrowFunction(visited) || ts.isFunctionExpression(visited)) {
+                    const transformedComponent = blockTransformer.transformComponent(visited);
                     if (transformedComponent) {
+                        if (debug) {
+                            const componentName = ts.isFunctionDeclaration(visited) && visited.name ? 
+                                visited.name.text : "anonymous component";
+                            console.log(`Component ${componentName} optimized for block memoization`);
+                        }
                         return transformedComponent;
                     }
                 }
 
-                // Continue visiting children
-                return ts.visitEachChild(node, visitNode, context);
+                // Return the visited node (with children potentially transformed)
+                return visited;
+            };
+
+            // Helper function to extract dependencies from createElement arguments
+            const extractDependenciesFromCreateElement = (props: ts.Expression, children: ts.Expression[]): string[] => {
+                const dependencies: string[] = [];
+                
+                // Extract dependencies from props
+                if (props && props.kind !== ts.SyntaxKind.NullKeyword && props.kind !== ts.SyntaxKind.UndefinedKeyword) {
+                    extractDependenciesFromExpression(props, dependencies);
+                }
+                
+                // Extract dependencies from children
+                for (const child of children) {
+                    extractDependenciesFromExpression(child, dependencies);
+                }
+                
+                // Remove duplicates
+                return [...new Set(dependencies)];
+            };
+
+            // Helper function to extract dependencies from any expression
+            const extractDependenciesFromExpression = (expr: ts.Expression, deps: string[]): void => {
+                if (ts.isIdentifier(expr)) {
+                    deps.push(expr.text);
+                    return;
+                }
+
+                if (ts.isPropertyAccessExpression(expr)) {
+                    extractDependenciesFromExpression(expr.expression, deps);
+                    return;
+                }
+
+                if (ts.isElementAccessExpression(expr)) {
+                    extractDependenciesFromExpression(expr.expression, deps);
+                    if (ts.isExpression(expr.argumentExpression)) {
+                        extractDependenciesFromExpression(expr.argumentExpression, deps);
+                    }
+                    return;
+                }
+
+                if (ts.isCallExpression(expr)) {
+                    extractDependenciesFromExpression(expr.expression, deps);
+                    expr.arguments.forEach(arg => {
+                        if (ts.isExpression(arg)) {
+                            extractDependenciesFromExpression(arg, deps);
+                        }
+                    });
+                    return;
+                }
+
+                if (ts.isTemplateExpression(expr)) {
+                    expr.templateSpans.forEach(span =>
+                        extractDependenciesFromExpression(span.expression, deps)
+                    );
+                    return;
+                }
+
+                if (ts.isBinaryExpression(expr)) {
+                    extractDependenciesFromExpression(expr.left, deps);
+                    extractDependenciesFromExpression(expr.right, deps);
+                    return;
+                }
+
+                if (ts.isObjectLiteralExpression(expr)) {
+                    expr.properties.forEach(prop => {
+                        if (ts.isPropertyAssignment(prop)) {
+                            extractDependenciesFromExpression(prop.initializer, deps);
+                        }
+                    });
+                    return;
+                }
+
+                if (ts.isArrayLiteralExpression(expr)) {
+                    expr.elements.forEach(el => {
+                        if (ts.isExpression(el)) {
+                            extractDependenciesFromExpression(el, deps);
+                        }
+                    });
+                    return;
+                }
+
+                // Handle other expression types by visiting children
+                ts.forEachChild(expr, child => {
+                    if (ts.isExpression(child)) {
+                        extractDependenciesFromExpression(child, deps);
+                    }
+                });
             };
 
             // Helper function to transform React.createElement calls
@@ -129,7 +241,7 @@ export default function (program: ts.Program, options: DecillionTransformerOptio
                     }
                     // Use createStaticElement for static content
                     // Convert null/undefined props to undefined for better type compatibility
-                    const propsArg = props.kind === ts.SyntaxKind.NullKeyword ? 
+                    const propsArg = props.kind === ts.SyntaxKind.NullKeyword || props.kind === ts.SyntaxKind.UndefinedKeyword ? 
                         ts.factory.createIdentifier("undefined") : props;
                     
                     return ts.factory.createCallExpression(
@@ -139,10 +251,51 @@ export default function (program: ts.Program, options: DecillionTransformerOptio
                     );
                 } else {
                     if (debug) {
-                        console.log(`Creating optimized element for ${elementType}`);
+                        console.log(`Creating memoized block for dynamic ${elementType}`);
                     }
-                    // Return optimized createElement call
-                    return node;
+                    
+                    // For dynamic content, create a memoized block
+                    const dependencies = extractDependenciesFromCreateElement(props, children);
+                    
+                    if (dependencies.length > 0) {
+                        // Create a block function for this dynamic element
+                        const blockId = `dynamic_${elementType}_${Math.random().toString(36).substr(2, 9)}`;
+                        
+                        // Create the block function
+                        const blockFunction = ts.factory.createArrowFunction(
+                            undefined,
+                            undefined,
+                            dependencies.map((dep: string) => 
+                                ts.factory.createParameterDeclaration(
+                                    undefined,
+                                    undefined,
+                                    ts.factory.createIdentifier(dep)
+                                )
+                            ),
+                            undefined,
+                            ts.factory.createToken(ts.SyntaxKind.EqualsGreaterThanToken),
+                            node // Return the original createElement call
+                        );
+                        
+                        // Create dependency array
+                        const depsArray = ts.factory.createArrayLiteralExpression(
+                            dependencies.map((dep: string) => ts.factory.createIdentifier(dep))
+                        );
+                        
+                        // Return useMemoizedBlock call
+                        return ts.factory.createCallExpression(
+                            ts.factory.createIdentifier("useMemoizedBlock"),
+                            undefined,
+                            [
+                                blockFunction,
+                                depsArray,
+                                ts.factory.createStringLiteral(blockId)
+                            ]
+                        );
+                    } else {
+                        // No dependencies, just return optimized createElement
+                        return node;
+                    }
                 }
             };
 

@@ -2,7 +2,7 @@
     "version": "2.0.0",
     "tasks": [
         {
-            "label": "Build All",
+            "label": "Build",
             "type": "shell",
             "command": "npm run build",
             "isBackground": false,
@@ -11,48 +11,48 @@
             ],
             "group": "build"
         },
-        {
-            "label": "Build Demo",
-            "type": "shell",
-            "command": "npm run build:demo",
-            "isBackground": false,
-            "problemMatcher": [
-                "$tsc"
-            ],
-            "group": "build"
-        },
-        {
-            "label": "Build Runtime",
-            "type": "shell",
-            "command": "npm run build:runtime",
-            "isBackground": false,
-            "problemMatcher": [
-                "$tsc"
-            ],
-            "group": "build"
-        },
-        {
-            "label": "Build Transformer",
-            "type": "shell",
-            "command": "npm run build:transformer",
-            "isBackground": false,
-            "problemMatcher": [
-                "$tsc"
-            ],
-            "group": "build"
-        },
-        {
-            "label": "Development Mode",
-            "type": "shell",
-            "command": "npm run dev",
-            "isBackground": true,
-            "problemMatcher": [
-                "$tsc-watch"
-            ],
-            "group": "build",
-            "runOptions": {
-                "runOn": "folderOpen"
-            }
-        }
+        // {
+        //     "label": "Build Demo",
+        //     "type": "shell",
+        //     "command": "npm run build:demo",
+        //     "isBackground": false,
+        //     "problemMatcher": [
+        //         "$tsc"
+        //     ],
+        //     "group": "build"
+        // },
+        // {
+        //     "label": "Build Runtime",
+        //     "type": "shell",
+        //     "command": "npm run build:runtime",
+        //     "isBackground": false,
+        //     "problemMatcher": [
+        //         "$tsc"
+        //     ],
+        //     "group": "build"
+        // },
+        // {
+        //     "label": "Build Transformer",
+        //     "type": "shell",
+        //     "command": "npm run build:transformer",
+        //     "isBackground": false,
+        //     "problemMatcher": [
+        //         "$tsc"
+        //     ],
+        //     "group": "build"
+        // },
+        // {
+        //     "label": "Development Mode",
+        //     "type": "shell",
+        //     "command": "npm run dev",
+        //     "isBackground": true,
+        //     "problemMatcher": [
+        //         "$tsc-watch"
+        //     ],
+        //     "group": "build",
+        //     "runOptions": {
+        //         "runOn": "folderOpen"
+        //     }
+        // }
     ]
 }

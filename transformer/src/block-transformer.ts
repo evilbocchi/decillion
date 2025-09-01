@@ -54,7 +54,10 @@ export class BlockTransformer {
                 return undefined;
             }
 
-            // Add component-level optimizations
+            // For now, we'll focus on optimizing the JSX content itself
+            // The individual JSX elements will be handled by transformJsxElement
+            // Future enhancement: Add React.memo equivalent for component-level memoization
+            
             return this.addComponentOptimizations(node);
         } catch (error) {
             // If transformation fails, return undefined to use original component
