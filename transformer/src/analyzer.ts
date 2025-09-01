@@ -114,6 +114,42 @@ export class BlockAnalyzer {
 
         // Check for call expressions (func())
         if (ts.isCallExpression(expr)) {
+            // Allow certain known static calls (like Color3.fromRGB, UDim2.new, Vector2.new)
+            const callExpr = expr.expression;
+            if (ts.isPropertyAccessExpression(callExpr)) {
+                const objName = ts.isIdentifier(callExpr.expression) ? callExpr.expression.text : "";
+                const methodName = ts.isIdentifier(callExpr.name) ? callExpr.name.text : "";
+
+                if ((objName === "Color3" && (methodName === "fromRGB" || methodName === "new")) ||
+                    (objName === "UDim2" && methodName === "new") ||
+                    (objName === "Vector2" && methodName === "new") ||
+                    (objName === "Vector3" && methodName === "new")) {
+                    // Check if all arguments are static (don't contain variables)
+                    return expr.arguments.some(arg => this.isDynamicExpression(arg as ts.Expression));
+                }
+            }
+
+            // Allow new expressions for Roblox constructors
+            if (ts.isIdentifier(callExpr)) {
+                const constructorName = callExpr.text;
+                if (constructorName === "Color3" || constructorName === "UDim2" ||
+                    constructorName === "Vector2" || constructorName === "Vector3") {
+                    return expr.arguments.some(arg => this.isDynamicExpression(arg as ts.Expression));
+                }
+            }
+
+            return true;
+        }
+
+        // Handle new expressions (new Color3(), new Vector2(), etc.)
+        if (ts.isNewExpression(expr)) {
+            if (ts.isIdentifier(expr.expression)) {
+                const constructorName = expr.expression.text;
+                if (constructorName === "Color3" || constructorName === "UDim2" ||
+                    constructorName === "Vector2" || constructorName === "Vector3") {
+                    return expr.arguments ? expr.arguments.some(arg => this.isDynamicExpression(arg as ts.Expression)) : false;
+                }
+            }
             return true;
         }
 
@@ -181,12 +217,79 @@ export class BlockAnalyzer {
         }
 
         if (ts.isCallExpression(expr)) {
+            // Check for static Roblox constructor calls
+            const callExpr = expr.expression;
+            if (ts.isPropertyAccessExpression(callExpr)) {
+                const objName = ts.isIdentifier(callExpr.expression) ? callExpr.expression.text : "";
+                const methodName = ts.isIdentifier(callExpr.name) ? callExpr.name.text : "";
+
+                if ((objName === "Color3" && (methodName === "fromRGB" || methodName === "new")) ||
+                    (objName === "UDim2" && methodName === "new") ||
+                    (objName === "Vector2" && methodName === "new") ||
+                    (objName === "Vector3" && methodName === "new")) {
+                    // Only extract dependencies from arguments, not the constructor itself
+                    expr.arguments.forEach(arg => {
+                        if (ts.isExpression(arg)) {
+                            this.extractDependencies(arg, deps);
+                        }
+                    });
+                    return;
+                }
+            }
+
+            // Allow new expressions for Roblox constructors
+            if (ts.isIdentifier(callExpr)) {
+                const constructorName = callExpr.text;
+                if (constructorName === "Color3" || constructorName === "UDim2" ||
+                    constructorName === "Vector2" || constructorName === "Vector3") {
+                    // Only extract dependencies from arguments, not the constructor itself
+                    if (expr.arguments) {
+                        expr.arguments.forEach(arg => {
+                            if (ts.isExpression(arg)) {
+                                this.extractDependencies(arg, deps);
+                            }
+                        });
+                    }
+                    return;
+                }
+            }
+
+            // For other call expressions, extract from both the function and arguments
             this.extractDependencies(expr.expression, deps);
             expr.arguments.forEach(arg => {
                 if (ts.isExpression(arg)) {
                     this.extractDependencies(arg, deps);
                 }
             });
+            return;
+        }
+
+        // Handle new expressions (new Color3(), new Vector2(), etc.)
+        if (ts.isNewExpression(expr)) {
+            if (ts.isIdentifier(expr.expression)) {
+                const constructorName = expr.expression.text;
+                if (constructorName === "Color3" || constructorName === "UDim2" ||
+                    constructorName === "Vector2" || constructorName === "Vector3") {
+                    // Only extract dependencies from arguments, not the constructor itself
+                    if (expr.arguments) {
+                        expr.arguments.forEach(arg => {
+                            if (ts.isExpression(arg)) {
+                                this.extractDependencies(arg, deps);
+                            }
+                        });
+                    }
+                    return;
+                }
+            }
+            // For other new expressions, extract dependencies normally
+            this.extractDependencies(expr.expression, deps);
+            if (expr.arguments) {
+                expr.arguments.forEach(arg => {
+                    if (ts.isExpression(arg)) {
+                        this.extractDependencies(arg, deps);
+                    }
+                });
+            }
             return;
         }
 
