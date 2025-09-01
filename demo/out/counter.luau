@@ -27,8 +27,8 @@ local function Counter()
 					BackgroundTransparency = 1,
 					Size = UDim2.new(1, 0, 1, 0),
 				})
-			end, { Color3 }, "dynamic_textlabel_trmo15bvl"))
-		end, { Color3 }, "dynamic_frame_wpnos7r71"), useMemoizedBlock(function(count, Color3)
+			end, { Color3 }, "dynamic_textlabel_mskr8xfdv"))
+		end, { Color3 }, "dynamic_frame_0p2r1bqkz"), useMemoizedBlock(function(count, Color3)
 			return React.createElement("textlabel", {
 				Text = `Count: {count}`,
 				TextColor3 = Color3.fromRGB(255, 255, 255),
@@ -36,7 +36,7 @@ local function Counter()
 				Size = UDim2.new(1, 0, 0, 40),
 				Position = UDim2.new(0, 0, 0, 60),
 			})
-		end, { count, Color3 }, "dynamic_textlabel_c3jmc0nn4"), useMemoizedBlock(function(Color3, increment)
+		end, { count, Color3 }, "dynamic_textlabel_stkr4yq6a"), useMemoizedBlock(function(Color3, increment)
 			return React.createElement("textbutton", {
 				Text = "Increment",
 				TextColor3 = Color3.fromRGB(255, 255, 255),
@@ -47,7 +47,7 @@ local function Counter()
 					MouseButton1Click = increment,
 				},
 			})
-		end, { Color3, increment }, "dynamic_textbutton_5ceydxgq3"), useMemoizedBlock(function(Color3, decrement)
+		end, { Color3, increment }, "dynamic_textbutton_kqhnrivfd"), useMemoizedBlock(function(Color3, decrement)
 			return React.createElement("textbutton", {
 				Text = "Decrement",
 				TextColor3 = Color3.fromRGB(255, 255, 255),
@@ -58,7 +58,7 @@ local function Counter()
 					MouseButton1Click = decrement,
 				},
 			})
-		end, { Color3, decrement }, "dynamic_textbutton_xwnjrkb2o"), useMemoizedBlock(function(Color3)
+		end, { Color3, decrement }, "dynamic_textbutton_0boocr41n"), useMemoizedBlock(function(Color3)
 			return React.createElement("frame", {
 				Size = UDim2.new(1, 0, 0, 100),
 				Position = UDim2.new(0, 0, 0, 160),
@@ -70,9 +70,9 @@ local function Counter()
 					BackgroundTransparency = 1,
 					Size = UDim2.new(1, 0, 1, 0),
 				})
-			end, { Color3 }, "dynamic_textlabel_wevsltm6y"))
-		end, { Color3 }, "dynamic_frame_n4grj1h24"))
-	end, { Color3, count, increment, decrement }, "dynamic_frame_8e6dwfv7g")
+			end, { Color3 }, "dynamic_textlabel_a6wbvy6pf"))
+		end, { Color3 }, "dynamic_frame_mxofyh0o8"))
+	end, { Color3, count, increment, decrement }, "dynamic_frame_c5khgm03k")
 end
 return {
 	default = Counter,

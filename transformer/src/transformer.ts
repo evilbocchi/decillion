@@ -16,18 +16,47 @@ import type { OptimizationContext, PropInfo, TransformResult } from "./types";
  */
 
 /**
- * Analyzes a JSX element using the existing BlockAnalyzer
+ * Main transformer class that consolidates all transformation logic
  */
-export function analyzeJsxElement(
-    node: ts.JsxElement | ts.JsxSelfClosingElement,
-    context: OptimizationContext
-): BlockInfo {
-    // Use the existing BlockAnalyzer for analysis
-    if (!context.blockAnalyzer) {
-        throw new Error("BlockAnalyzer not provided in context");
+export class DecillionTransformer {
+    private context: OptimizationContext;
+
+    constructor(
+        typeChecker: ts.TypeChecker,
+        transformationContext: ts.TransformationContext,
+        blockAnalyzer: any
+    ) {
+        this.context = {
+            typeChecker,
+            context: transformationContext,
+            blockCounter: 0,
+            generatedBlocks: new Set<string>(),
+            blockFunctions: new Map<string, ts.FunctionDeclaration>(),
+            staticPropsTables: new Map<string, PropInfo[]>(),
+            blockAnalyzer
+        };
     }
 
-    return context.blockAnalyzer.analyzeJsxElement(node);
+    /**
+     * Analyzes a JSX element using the existing BlockAnalyzer
+     */
+    analyzeJsxElement(
+        node: ts.JsxElement | ts.JsxSelfClosingElement
+    ): BlockInfo {
+        // Use the existing BlockAnalyzer for analysis
+        if (!this.context.blockAnalyzer) {
+            throw new Error("BlockAnalyzer not provided in context");
+        }
+
+        return this.context.blockAnalyzer.analyzeJsxElement(node);
+    }
+
+    /**
+     * Gets the optimization context for external access
+     */
+    getContext(): OptimizationContext {
+        return this.context;
+    }
 }
 
 /**
@@ -37,7 +66,13 @@ export function transformJsxElement(
     node: ts.JsxElement | ts.JsxSelfClosingElement,
     context: OptimizationContext
 ): TransformResult {
-    const blockInfo = analyzeJsxElement(node, context);
+    const transformer = new DecillionTransformer(
+        context.typeChecker,
+        context.context,
+        context.blockAnalyzer
+    );
+    
+    const blockInfo = transformer.analyzeJsxElement(node);
     const tagName = context.blockAnalyzer!.getJsxTagName(node);
 
     if (blockInfo.isStatic) {

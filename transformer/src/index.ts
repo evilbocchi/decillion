@@ -1,7 +1,7 @@
-import { OptimizationContext, PropInfo } from "types";
 import * as ts from "typescript";
 import { BlockAnalyzer } from "./block-analyzer";
-import { transformJsxElement } from "./transformer";
+import { DecillionTransformer, transformJsxElement } from "./transformer";
+import type { OptimizationContext, PropInfo } from "./types";
 
 /**
  * Configuration options for the Decillion transformer
@@ -38,17 +38,14 @@ export default function (program: ts.Program, options: DecillionTransformerOptio
                 return file;
             }
 
-            // Initialize transformation context
+            // Initialize transformation context with the new architecture
             const blockAnalyzer = new BlockAnalyzer(program.getTypeChecker(), context);
-            const optimizationContext: OptimizationContext = {
-                typeChecker: program.getTypeChecker(),
+            const transformer = new DecillionTransformer(
+                program.getTypeChecker(),
                 context,
-                blockCounter: 0,
-                generatedBlocks: new Set<string>(),
-                blockFunctions: new Map<string, ts.FunctionDeclaration>(),
-                staticPropsTables: new Map<string, PropInfo[]>(),
                 blockAnalyzer
-            };
+            );
+            const optimizationContext = transformer.getContext();
 
             let needsRuntimeImport = false;
 

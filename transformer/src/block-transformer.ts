@@ -1,36 +1,35 @@
-import { transformJsxElement } from "transformer";
-import { OptimizationContext, PropInfo } from "types";
 import * as ts from "typescript";
+import { OptimizationContext, PropInfo } from "./types";
 import { BlockAnalyzer } from "./block-analyzer";
+import { DecillionTransformer, transformJsxElement } from "./transformer";
 
 /**
- * Legacy wrapper for block transformation
- * @deprecated Use the new modular block system instead
+ * Legacy compatibility wrapper for block transformation
+ * This provides backward compatibility while using the new consolidated architecture
+ * @deprecated Use DecillionTransformer class directly from transformer.ts
  */
 export class BlockTransformer {
-    private context: OptimizationContext;
+    private transformer: DecillionTransformer;
 
     constructor(
         private typeChecker: ts.TypeChecker,
         private transformationContext: ts.TransformationContext,
         private analyzer: BlockAnalyzer
     ) {
-        this.context = {
+        this.transformer = new DecillionTransformer(
             typeChecker,
-            context: transformationContext,
-            blockCounter: 0,
-            generatedBlocks: new Set<string>(),
-            blockFunctions: new Map<string, ts.FunctionDeclaration>(),
-            staticPropsTables: new Map<string, PropInfo[]>()
-        };
+            transformationContext,
+            analyzer
+        );
     }
 
     /**
      * Transforms a JSX element into an optimized block call
+     * @deprecated Use transformJsxElement function directly
      */
     transformJsxElement(node: ts.JsxElement | ts.JsxSelfClosingElement): ts.Node {
         try {
-            const result = transformJsxElement(node, this.context);
+            const result = transformJsxElement(node, this.transformer.getContext());
             return result.element;
         } catch (error) {
             // If transformation fails, return original node as fallback
@@ -90,18 +89,18 @@ export class BlockTransformer {
     }
 
     hasGeneratedBlocks(): boolean {
-        return this.context.generatedBlocks.size > 0;
+        return this.transformer.getContext().generatedBlocks.size > 0;
     }
 
     getBlockFunctions(): Map<string, ts.FunctionDeclaration> {
-        return this.context.blockFunctions;
+        return this.transformer.getContext().blockFunctions;
     }
 
     hasStaticPropsTables(): boolean {
-        return this.context.staticPropsTables.size > 0;
+        return this.transformer.getContext().staticPropsTables.size > 0;
     }
 
     getStaticPropsTables(): Map<string, PropInfo[]> {
-        return this.context.staticPropsTables;
+        return this.transformer.getContext().staticPropsTables;
     }
 }
