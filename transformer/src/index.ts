@@ -443,6 +443,11 @@ export default function (program: ts.Program, options: DecillionTransformerOptio
                     transformedFile = addBlockFunctions(transformedFile, blockTransformer.getBlockFunctions());
                 }
 
+                // Add static props tables if any were created
+                if (blockTransformer.hasStaticPropsTables()) {
+                    transformedFile = addStaticPropsTables(transformedFile, blockTransformer.getStaticPropsTables());
+                }
+
                 // Add signature comment if requested
                 if (addSignature) {
                     const signature = signatureMessage || "Optimized by Decillion - Million.js-style block memoization for Roblox-TS";
@@ -505,6 +510,65 @@ export default function (program: ts.Program, options: DecillionTransformerOptio
             function addBlockFunctions(file: ts.SourceFile, blockFunctions: Map<string, ts.FunctionDeclaration>): ts.SourceFile {
                 const blockFunctionStatements = Array.from(blockFunctions.values());
                 const statements = [...file.statements, ...blockFunctionStatements];
+                
+                return ts.factory.updateSourceFile(
+                    file,
+                    statements,
+                    file.isDeclarationFile,
+                    file.referencedFiles,
+                    file.typeReferenceDirectives,
+                    file.hasNoDefaultLib,
+                    file.libReferenceDirectives
+                );
+            }
+
+            // Helper function to add static props tables
+            function addStaticPropsTables(
+                file: ts.SourceFile, 
+                staticPropsTables: Map<string, Array<{ name: string; value: ts.Expression; }>>
+            ): ts.SourceFile {
+                const propsTableStatements: ts.Statement[] = [];
+                
+                for (const [id, props] of staticPropsTables) {
+                    // Create const STATIC_PROPS_XXX = { ... };
+                    const properties = props.map(prop =>
+                        ts.factory.createPropertyAssignment(
+                            ts.factory.createIdentifier(prop.name),
+                            prop.value
+                        )
+                    );
+
+                    const propsObject = ts.factory.createObjectLiteralExpression(properties, true);
+                    
+                    const constDeclaration = ts.factory.createVariableStatement(
+                        undefined,
+                        ts.factory.createVariableDeclarationList(
+                            [ts.factory.createVariableDeclaration(
+                                ts.factory.createIdentifier(id),
+                                undefined,
+                                undefined,
+                                propsObject
+                            )],
+                            ts.NodeFlags.Const
+                        )
+                    );
+                    
+                    propsTableStatements.push(constDeclaration);
+                }
+
+                // Insert static props tables after imports but before other statements
+                const importStatements: ts.Statement[] = [];
+                const otherStatements: ts.Statement[] = [];
+                
+                for (const stmt of file.statements) {
+                    if (ts.isImportDeclaration(stmt)) {
+                        importStatements.push(stmt);
+                    } else {
+                        otherStatements.push(stmt);
+                    }
+                }
+                
+                const statements = [...importStatements, ...propsTableStatements, ...otherStatements];
                 
                 return ts.factory.updateSourceFile(
                     file,

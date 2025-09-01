@@ -7,6 +7,7 @@ import { BlockAnalyzer, BlockInfo } from "./block-analyzer";
 export class BlockTransformer {
     private generatedBlocks = new Set<string>();
     private blockFunctions = new Map<string, ts.FunctionDeclaration>();
+    private staticPropsTables = new Map<string, Array<{ name: string; value: ts.Expression; }>>();
 
     constructor(
         private typeChecker: ts.TypeChecker,
@@ -76,9 +77,19 @@ export class BlockTransformer {
         const children = this.extractStaticChildren(node);
 
         // Create props object or use undefined if no props
-        const propsArg = props.length > 0 ? 
-            this.createPropsObject(props) : 
-            ts.factory.createIdentifier("undefined");
+        let propsArg: ts.Expression;
+        if (props.length > 0) {
+            // Generate a unique identifier for this static props table
+            const propsId = `STATIC_PROPS_${tagName.toUpperCase()}_${Math.random().toString(36).substr(2, 6)}`;
+            
+            // Store the props object for later insertion at module level
+            this.addStaticPropsTable(propsId, props);
+            
+            // Reference the static props table
+            propsArg = ts.factory.createIdentifier(propsId);
+        } else {
+            propsArg = ts.factory.createIdentifier("undefined");
+        }
 
         return ts.factory.createCallExpression(
             ts.factory.createIdentifier("createStaticElement"),
@@ -308,7 +319,13 @@ export class BlockTransformer {
                 const propName = ts.isIdentifier(attr.name) ? attr.name.text : attr.name.getText();
 
                 if (ts.isStringLiteral(attr.initializer)) {
+                    // String literal props are static
                     props.push({ name: propName, value: attr.initializer });
+                } else if (ts.isJsxExpression(attr.initializer) && attr.initializer.expression) {
+                    // Check if the JSX expression contains a static value
+                    if (this.isStaticExpression(attr.initializer.expression)) {
+                        props.push({ name: propName, value: attr.initializer.expression });
+                    }
                 }
             }
         }
@@ -459,5 +476,82 @@ export class BlockTransformer {
 
     getBlockFunctions(): Map<string, ts.FunctionDeclaration> {
         return this.blockFunctions;
+    }
+
+    hasStaticPropsTables(): boolean {
+        return this.staticPropsTables.size > 0;
+    }
+
+    getStaticPropsTables(): Map<string, Array<{ name: string; value: ts.Expression; }>> {
+        return this.staticPropsTables;
+    }
+
+    /**
+     * Adds a static props table for later insertion at module level
+     */
+    private addStaticPropsTable(id: string, props: Array<{ name: string; value: ts.Expression; }>): void {
+        this.staticPropsTables.set(id, props);
+    }
+
+    /**
+     * Helper function to check if an expression is static
+     */
+    private isStaticExpression(expr: ts.Expression): boolean {
+        if (ts.isStringLiteral(expr) || ts.isNumericLiteral(expr) ||
+            ts.isBooleanLiteral(expr) || expr.kind === ts.SyntaxKind.NullKeyword) {
+            return true;
+        }
+
+        if (ts.isCallExpression(expr)) {
+            const callExpr = expr.expression;
+            // Allow certain known static calls (like Color3.fromRGB, UDim2.new, Vector2.new)
+            if (ts.isPropertyAccessExpression(callExpr)) {
+                const objName = ts.isIdentifier(callExpr.expression) ? callExpr.expression.text : "";
+                const methodName = ts.isIdentifier(callExpr.name) ? callExpr.name.text : "";
+
+                if ((objName === "Color3" && (methodName === "fromRGB" || methodName === "new")) ||
+                    (objName === "UDim2" && methodName === "new") ||
+                    (objName === "Vector2" && methodName === "new") ||
+                    (objName === "Vector3" && methodName === "new")) {
+                    // Check if all arguments are static
+                    return expr.arguments.every(arg => this.isStaticExpression(arg as ts.Expression));
+                }
+            }
+            
+            // Allow new expressions for Roblox constructors
+            if (ts.isIdentifier(callExpr)) {
+                const constructorName = callExpr.text;
+                if (constructorName === "Color3" || constructorName === "UDim2" || 
+                    constructorName === "Vector2" || constructorName === "Vector3") {
+                    return expr.arguments.every(arg => this.isStaticExpression(arg as ts.Expression));
+                }
+            }
+            
+            return false;
+        }
+
+        // Handle new expressions (new Color3(), new Vector2(), etc.)
+        if (ts.isNewExpression(expr)) {
+            if (ts.isIdentifier(expr.expression)) {
+                const constructorName = expr.expression.text;
+                if (constructorName === "Color3" || constructorName === "UDim2" || 
+                    constructorName === "Vector2" || constructorName === "Vector3") {
+                    return expr.arguments ? expr.arguments.every(arg => this.isStaticExpression(arg as ts.Expression)) : true;
+                }
+            }
+            return false;
+        }
+
+        if (ts.isTemplateExpression(expr)) {
+            // Template expressions with variables are dynamic
+            return false;
+        }
+
+        if (ts.isIdentifier(expr) || ts.isPropertyAccessExpression(expr)) {
+            // Variable references are dynamic
+            return false;
+        }
+
+        return false;
     }
 }
