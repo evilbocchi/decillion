@@ -128,7 +128,7 @@ export function createParametersWithTypes(dependencies: string[]): ts.ParameterD
             typeNode = ts.factory.createKeywordTypeNode(ts.SyntaxKind.StringKeyword);
         } else if (dep.includes('visible') || dep.includes('enabled') || dep.includes('active')) {
             typeNode = ts.factory.createKeywordTypeNode(ts.SyntaxKind.BooleanKeyword);
-        } else if (dep.includes('ment') || dep.includes('click') || dep.includes('handler') || dep.endsWith('ment') || dep.includes('callback')) {
+        } else if (dep.includes('ment') || dep.toLowerCase().includes('click') || dep.toLowerCase().includes('handler') || dep.endsWith('ment') || dep.includes('callback')) {
             // Function dependencies (event handlers like increment, decrement)
             typeNode = ts.factory.createFunctionTypeNode(
                 undefined,

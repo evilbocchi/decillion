@@ -2,4 +2,5 @@
 **/*.tsbuildinfo
 demo/include
 out
+coverage
 !demo/out
