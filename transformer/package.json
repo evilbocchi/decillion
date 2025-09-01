@@ -13,7 +13,7 @@
         "url": "https://github.com/evilbocchi/decillion.git"
     },
     "dependencies": {
-        "typescript": "^5.5.3"
+        "typescript": "^5.9.2"
     },
     "devDependencies": {
         "@rbxts/types": "^1.0.845",

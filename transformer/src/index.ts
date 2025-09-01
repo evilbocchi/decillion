@@ -22,22 +22,29 @@ export interface DecillionTransformerOptions {
 export default function (program: ts.Program, options: DecillionTransformerOptions = {}) {
     const { addSignature = true, signatureMessage, debug = true } = options;
 
-    return (context: ts.TransformationContext): ((file: ts.SourceFile) => ts.Node) => {
-        return (file: ts.SourceFile) => {
-            // Only process SourceFile nodes that contain JSX
-            if (!ts.isSourceFile(file)) {
-                return file;
-            }
+    console.log(`[DECILLION] Transformer loading for program with ${program.getSourceFiles().length} source files`);
 
-            const sourceFile = file;
+    return (context: ts.TransformationContext): ts.Transformer<ts.SourceFile> => {
+        return (sourceFile: ts.SourceFile) => {
+            console.log(`[DECILLION] Processing file: ${sourceFile.fileName}`);
 
-            if (debug) {
+            // Only debug the counter.tsx file to avoid too much output
+            const isCounterFile = sourceFile.fileName.includes('counter.tsx');
+            const actualDebug = debug && isCounterFile;
+
+            if (actualDebug) {
                 console.log(`Decillion transformer processing: ${sourceFile.fileName}`);
             }
 
             // Quick check: if the file doesn't contain JSX, don't transform it
             const sourceText = sourceFile.getFullText();
+            if (actualDebug) {
+                console.log(`Source text preview: ${sourceText.substring(0, 200)}`);
+            }
             if (!sourceText.includes('<')) {
+                if (actualDebug) {
+                    console.log(`No JSX found in file`);
+                }
                 return sourceFile;
             }
 
@@ -107,7 +114,7 @@ export default function (program: ts.Program, options: DecillionTransformerOptio
                         .map(child => transformJsxChild(child))
                         .filter((child): child is ts.Expression => child !== null);
                     
-                    // Use createStaticElement for static content
+                    // Use createStaticElement for static content - return call directly
                     const staticElementCall = ts.factory.createCallExpression(
                         ts.factory.createIdentifier("createStaticElement"),
                         undefined,
@@ -118,8 +125,8 @@ export default function (program: ts.Program, options: DecillionTransformerOptio
                         ]
                     );
                     
-                    // Return the call expression wrapped in a JSX expression when in JSX context
-                    return ts.factory.createJsxExpression(undefined, staticElementCall);
+                    // Return the call expression directly
+                    return staticElementCall;
                 } else {
                     if (debug) {
                         console.log(`JSX element ${tagName} is dynamic, keeping as-is for now`);
@@ -467,7 +474,7 @@ export default function (program: ts.Program, options: DecillionTransformerOptio
                                     .map(child => transformJsxChild(child))
                                     .filter((child): child is ts.Expression => child !== null);
                                 
-                                // Create a direct createStaticElement call
+                                // Create a direct createStaticElement call - return it directly, don't wrap in JSX expression
                                 const createStaticElementCall = ts.factory.createCallExpression(
                                     ts.factory.createIdentifier("createStaticElement"),
                                     undefined,
@@ -478,18 +485,12 @@ export default function (program: ts.Program, options: DecillionTransformerOptio
                                     ]
                                 );
                                 
-                                // Create a JSX expression containing the createStaticElement call
-                                const jsxExpression = ts.factory.createJsxExpression(
-                                    undefined,
-                                    createStaticElementCall
-                                );
-                                
                                 transformationTracker.needsRuntimeImport = true;
                                 if (debug) {
-                                    console.log(`Transformed ${tagName} JSX element to JSX expression with createStaticElement call`);
+                                    console.log(`Transformed ${tagName} JSX element to createStaticElement call`);
                                 }
                                 
-                                return ts.visitEachChild(jsxExpression, visitNode, context);
+                                return ts.visitEachChild(createStaticElementCall, visitNode, context);
                             } else {
                                 if (debug) {
                                     console.log(`JSX element ${tagName} is dynamic, keeping as JSX`);
@@ -562,23 +563,42 @@ export default function (program: ts.Program, options: DecillionTransformerOptio
             };
 
             try {
-                if (debug) {
+                if (actualDebug) {
                     console.log(`Analyzing file for optimization opportunities...`);
                 }
 
                 // First check if this file contains JSX elements OR React.createElement calls
                 let hasRobloxElements = false;
-                ts.forEachChild(sourceFile, function visit(node: ts.Node) {
-                    // Check for JSX elements
+                let visitCount = 0;
+                
+                const deepVisit = (node: ts.Node): void => {
+                    if (actualDebug && visitCount < 10) {
+                        console.log(`Visiting node: ${ts.SyntaxKind[node.kind]}`);
+                        visitCount++;
+                    }
+                    
+                    // Check for JSX elements (in case they haven't been transformed yet)
                     if (ts.isJsxElement(node) || ts.isJsxSelfClosingElement(node)) {
-                        const elementName = ts.isJsxElement(node) 
-                            ? node.openingElement.tagName 
-                            : node.tagName;
-                        
-                        if (ts.isIdentifier(elementName)) {
-                            const tagName = elementName.text;
-                            if (tagName === "frame" || tagName === "textlabel" || tagName === "textbutton") {
-                                hasRobloxElements = true;
+                        try {
+                            const elementName = ts.isJsxElement(node) 
+                                ? node.openingElement.tagName 
+                                : node.tagName;
+                            
+                            if (ts.isIdentifier(elementName)) {
+                                const tagName = elementName.text;
+                                if (actualDebug) {
+                                    console.log(`Found JSX element: ${tagName}`);
+                                }
+                                if (tagName === "frame" || tagName === "textlabel" || tagName === "textbutton") {
+                                    hasRobloxElements = true;
+                                    if (actualDebug) {
+                                        console.log(`Found Roblox JSX element: ${tagName}`);
+                                    }
+                                }
+                            }
+                        } catch (error) {
+                            if (actualDebug) {
+                                console.log(`Error processing JSX element: ${error}`);
                             }
                         }
                     }
@@ -595,21 +615,28 @@ export default function (program: ts.Program, options: DecillionTransformerOptio
                                 const elementType = node.arguments[0].text;
                                 if (elementType === "frame" || elementType === "textlabel" || elementType === "textbutton") {
                                     hasRobloxElements = true;
+                                    if (actualDebug) {
+                                        console.log(`Found React.createElement call for: ${elementType}`);
+                                    }
                                 }
                             }
                         }
                     }
-                    ts.forEachChild(node, visit);
-                });
+                    
+                    // Recursively visit all child nodes
+                    node.forEachChild(deepVisit);
+                };
+                
+                deepVisit(sourceFile);
 
                 if (!hasRobloxElements) {
-                    if (debug) {
+                    if (actualDebug) {
                         console.log(`No Roblox UI elements found`);
                     }
                     return sourceFile;
                 }
 
-                if (debug) {
+                if (actualDebug) {
                     console.log(`Found Roblox UI elements, applying AST-based optimizations`);
                 }
 
