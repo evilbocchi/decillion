@@ -11,6 +11,26 @@ export interface BlockInfo {
 }
 
 /**
+ * Known static Roblox constructors and methods as fallback
+ * when the static detector can't find the @rbxts/types definitions
+ */
+const KNOWN_STATIC_ROBLOX_METHODS: Record<string, Set<string>> = {
+    "UDim2": new Set(["new", "fromOffset", "fromScale"]),
+    "Vector2": new Set(["new"]),
+    "Vector3": new Set(["new", "fromNormalId", "fromAxis", "FromNormalId", "FromAxis"]),
+    "Color3": new Set(["new", "fromRGB", "fromHSV", "fromHex", "toHSV"]),
+    "CFrame": new Set(["new", "fromEulerAnglesXYZ", "fromEulerAnglesYXZ", "fromAxisAngle", "fromMatrix", "lookAt", "Angles"]),
+    "Region3": new Set(["new"]),
+    "Ray": new Set(["new"]),
+    "BrickColor": new Set(["new", "random", "Random", "White", "Gray", "DarkGray", "Black", "Red", "Yellow", "Green", "Blue"]),
+    "Enum": new Set([]),  // Enum values are static
+};
+
+const KNOWN_STATIC_ROBLOX_CONSTRUCTORS = new Set([
+    "UDim2", "Vector2", "Vector3", "Color3", "CFrame", "Region3", "Ray", "BrickColor"
+]);
+
+/**
  * Analyzes JSX elements to determine optimization opportunities
  * Identifies static vs dynamic content for block memoization
  */
@@ -111,6 +131,47 @@ export class BlockAnalyzer {
     }
 
     /**
+     * Helper method to check if a call expression is a static Roblox call
+     * Uses both the static detector and fallback known methods
+     */
+    private isStaticRobloxCall(expr: ts.CallExpression): boolean {
+        // First try the official static detector
+        if (robloxStaticDetector.isStaticRobloxCall(expr)) {
+            return true;
+        }
+
+        // Fallback to known static methods
+        if (ts.isPropertyAccessExpression(expr.expression)) {
+            const objName = ts.isIdentifier(expr.expression.expression) ? expr.expression.expression.text : "";
+            const methodName = ts.isIdentifier(expr.expression.name) ? expr.expression.name.text : "";
+            
+            const knownMethods = KNOWN_STATIC_ROBLOX_METHODS[objName];
+            return knownMethods ? knownMethods.has(methodName) : false;
+        }
+
+        return false;
+    }
+
+    /**
+     * Helper method to check if a new expression is a static Roblox constructor
+     * Uses both the static detector and fallback known constructors
+     */
+    private isStaticRobloxNew(expr: ts.NewExpression): boolean {
+        // First try the official static detector
+        if (robloxStaticDetector.isStaticRobloxNew(expr)) {
+            return true;
+        }
+
+        // Fallback to known static constructors
+        if (ts.isIdentifier(expr.expression)) {
+            const constructorName = expr.expression.text;
+            return KNOWN_STATIC_ROBLOX_CONSTRUCTORS.has(constructorName);
+        }
+
+        return false;
+    }
+
+    /**
      * Determines if an expression contains dynamic content
      */
     private isDynamicExpression(expr: ts.Expression): boolean {
@@ -131,8 +192,8 @@ export class BlockAnalyzer {
 
         // Check for call expressions (func())
         if (ts.isCallExpression(expr)) {
-            // Use the Roblox static detector for more comprehensive detection
-            if (robloxStaticDetector.isStaticRobloxCall(expr)) {
+            // Use our helper method for comprehensive static detection
+            if (this.isStaticRobloxCall(expr)) {
                 // Check if all arguments are static (don't contain variables)
                 return expr.arguments.some(arg => this.isDynamicExpression(arg as ts.Expression));
             }
@@ -142,8 +203,8 @@ export class BlockAnalyzer {
 
         // Handle new expressions (new Color3(), new Vector2(), etc.)
         if (ts.isNewExpression(expr)) {
-            // Use the Roblox static detector
-            if (robloxStaticDetector.isStaticRobloxNew(expr)) {
+            // Use our helper method for comprehensive static detection
+            if (this.isStaticRobloxNew(expr)) {
                 return expr.arguments ? expr.arguments.some(arg => this.isDynamicExpression(arg as ts.Expression)) : false;
             }
             return true;
@@ -214,8 +275,8 @@ export class BlockAnalyzer {
 
         // Handle call expressions (func())
         if (ts.isCallExpression(expr)) {
-            // Use the Roblox static detector for more comprehensive detection
-            if (robloxStaticDetector.isStaticRobloxCall(expr)) {
+            // Use our helper method for comprehensive static detection
+            if (this.isStaticRobloxCall(expr)) {
                 // Only extract dependencies from arguments, not the constructor itself
                 expr.arguments.forEach(arg => {
                     if (ts.isExpression(arg)) {
@@ -237,8 +298,8 @@ export class BlockAnalyzer {
 
         // Handle new expressions (new Color3(), new Vector2(), etc.)
         if (ts.isNewExpression(expr)) {
-            // Use the Roblox static detector
-            if (robloxStaticDetector.isStaticRobloxNew(expr)) {
+            // Use our helper method for comprehensive static detection
+            if (this.isStaticRobloxNew(expr)) {
                 // Only extract dependencies from arguments, not the constructor itself
                 if (expr.arguments) {
                     expr.arguments.forEach(arg => {
