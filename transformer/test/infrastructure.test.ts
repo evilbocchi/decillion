@@ -1,5 +1,5 @@
 /// <reference types="@rbxts/types" />
-import { describe, it, expect } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
 describe('Test Infrastructure', () => {
     it('should have working test environment', () => {

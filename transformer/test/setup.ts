@@ -64,9 +64,9 @@ class MockColor3 {
         const c = v * s;
         const x = c * (1 - Math.abs(((h / 60) % 2) - 1));
         const m = v - c;
-        
+
         let r = 0, g = 0, b = 0;
-        
+
         if (0 <= h && h < 60) {
             r = c; g = x; b = 0;
         } else if (60 <= h && h < 120) {
@@ -80,7 +80,7 @@ class MockColor3 {
         } else if (300 <= h && h < 360) {
             r = c; g = 0; b = x;
         }
-        
+
         return new MockColor3(r + m, g + m, b + m);
     }
 }
@@ -93,6 +93,12 @@ class MockColor3 {
     })
 };
 
+
+
+// Assign mocks to global objects
+(globalThis as any).UDim2 = MockUDim2;
+(globalThis as any).Vector2 = MockVector2;
+(globalThis as any).Color3 = MockColor3;
 // Assign mocks to global objects
 (globalThis as any).UDim2 = MockUDim2;
 (globalThis as any).Vector2 = MockVector2;
