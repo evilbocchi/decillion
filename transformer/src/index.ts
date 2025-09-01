@@ -102,18 +102,23 @@ export default function (program: ts.Program, options: DecillionTransformerOptio
                     // Convert JSX attributes to object literal
                     const propsObject = createPropsObjectFromJsxAttributes(attributes);
                     
+                    // Convert children, filtering out empty/null ones
+                    const transformedChildren = children
+                        .map(child => transformJsxChild(child))
+                        .filter((child): child is ts.Expression => child !== null);
+                    
                     // Use createStaticElement for static content
                     const staticElementCall = ts.factory.createCallExpression(
                         ts.factory.createIdentifier("createStaticElement"),
                         undefined,
                         [
                             ts.factory.createStringLiteral(tagName),
-                            propsObject || ts.factory.createNull(),
-                            ...children.map(child => transformJsxChild(child))
+                            propsObject || ts.factory.createIdentifier("undefined"),
+                            ...transformedChildren
                         ]
                     );
                     
-                    // Wrap in JSX expression for proper integration
+                    // Return the call expression wrapped in a JSX expression when in JSX context
                     return ts.factory.createJsxExpression(undefined, staticElementCall);
                 } else {
                     if (debug) {
@@ -126,18 +131,29 @@ export default function (program: ts.Program, options: DecillionTransformerOptio
 
             // Helper function to check if JSX element is static
             const isStaticJsxElement = (attributes: ts.JsxAttributes, children: ts.JsxChild[]): boolean => {
+                if (debug) {
+                    console.log(`Checking static status for element with ${attributes.properties.length} attributes and ${children.length} children`);
+                }
+                
                 // Check if all attributes are static
                 for (const prop of attributes.properties) {
                     if (ts.isJsxAttribute(prop)) {
                         if (prop.initializer) {
                             if (ts.isJsxExpression(prop.initializer)) {
                                 if (prop.initializer.expression && !isStaticExpression(prop.initializer.expression)) {
+                                    if (debug) {
+                                        const propName = ts.isIdentifier(prop.name) ? prop.name.text : "unknown";
+                                        console.log(`Attribute ${propName} has dynamic expression, marking as dynamic`);
+                                    }
                                     return false;
                                 }
                             }
                         }
                     } else {
                         // JsxSpreadAttribute - dynamic
+                        if (debug) {
+                            console.log(`Found spread attribute, marking as dynamic`);
+                        }
                         return false;
                     }
                 }
@@ -146,15 +162,48 @@ export default function (program: ts.Program, options: DecillionTransformerOptio
                 for (const child of children) {
                     if (ts.isJsxExpression(child)) {
                         if (child.expression && !isStaticExpression(child.expression)) {
+                            if (debug) {
+                                console.log(`Found dynamic JSX expression child, marking as dynamic`);
+                            }
                             return false;
                         }
                     } else if (ts.isJsxElement(child) || ts.isJsxSelfClosingElement(child)) {
-                        // Recursively check child elements - for now, assume dynamic
-                        return false;
+                        // Recursively check child elements
+                        let childTagName: string;
+                        let childAttributes: ts.JsxAttributes;
+                        let childChildren: ts.JsxChild[] = [];
+
+                        if (ts.isJsxElement(child)) {
+                            const elementName = child.openingElement.tagName;
+                            if (!ts.isIdentifier(elementName)) return false;
+                            childTagName = elementName.text;
+                            childAttributes = child.openingElement.attributes;
+                            childChildren = child.children ? Array.from(child.children) : [];
+                        } else {
+                            const elementName = child.tagName;
+                            if (!ts.isIdentifier(elementName)) return false;
+                            childTagName = elementName.text;
+                            childAttributes = child.attributes;
+                        }
+
+                        if (debug) {
+                            console.log(`Recursively checking child element: ${childTagName}`);
+                        }
+
+                        // Recursively check if child element is static
+                        if (!isStaticJsxElement(childAttributes, childChildren)) {
+                            if (debug) {
+                                console.log(`Child element ${childTagName} is dynamic, marking parent as dynamic`);
+                            }
+                            return false;
+                        }
                     }
                     // JsxText and JsxFragment are static
                 }
 
+                if (debug) {
+                    console.log(`Element is static`);
+                }
                 return true;
             };
 
@@ -203,16 +252,17 @@ export default function (program: ts.Program, options: DecillionTransformerOptio
             };
 
             // Helper function to transform JSX children
-            const transformJsxChild = (child: ts.JsxChild): ts.Expression => {
+            const transformJsxChild = (child: ts.JsxChild): ts.Expression | null => {
                 if (ts.isJsxText(child)) {
-                    return ts.factory.createStringLiteral(child.text.trim());
+                    const text = child.text.trim();
+                    return text ? ts.factory.createStringLiteral(text) : null;
                 } else if (ts.isJsxExpression(child) && child.expression) {
                     return child.expression;
                 } else if (ts.isJsxElement(child) || ts.isJsxSelfClosingElement(child)) {
                     return transformJsxElement(child);
                 }
-                // For other cases, return a placeholder
-                return ts.factory.createNull();
+                // For other cases, return null (will be filtered out)
+                return null;
             };
 
             // Helper function to transform React.createElement calls
@@ -241,7 +291,7 @@ export default function (program: ts.Program, options: DecillionTransformerOptio
                     return ts.factory.createCallExpression(
                         ts.factory.createIdentifier("createStaticElement"),
                         undefined,
-                        [node.arguments[0], props, ...children]
+                        [node.arguments[0], props && props.kind !== ts.SyntaxKind.NullKeyword ? props : ts.factory.createIdentifier("undefined"), ...children]
                     );
                 } else {
                     if (debug) {
@@ -303,6 +353,20 @@ export default function (program: ts.Program, options: DecillionTransformerOptio
                     return false;
                 }
 
+                if (ts.isNewExpression(expr)) {
+                    // Handle new expressions like new UDim2(1, 0, 1, 0)
+                    if (ts.isIdentifier(expr.expression)) {
+                        const typeName = expr.expression.text;
+                        
+                        if (typeName === "UDim2" || typeName === "Color3" || typeName === "Vector3" || 
+                            typeName === "Vector2" || typeName === "CFrame" || typeName === "UDim") {
+                            // Check if all arguments are static
+                            return expr.arguments ? expr.arguments.every(arg => isStaticExpression(arg as ts.Expression)) : true;
+                        }
+                    }
+                    return false;
+                }
+
                 if (ts.isTemplateExpression(expr)) {
                     // Template expressions with variables are dynamic
                     return false;
@@ -334,15 +398,19 @@ export default function (program: ts.Program, options: DecillionTransformerOptio
                             // Transform JSX to optimized call
                             const transformedElement = transformJsxElement(node);
                             
-                            // Check if transformation created a JSX expression (meaning it was transformed)
-                            if (ts.isJsxExpression(transformedElement)) {
+                            // Check if transformation created a JSX expression with createStaticElement call
+                            if (ts.isJsxExpression(transformedElement) && 
+                                transformedElement.expression &&
+                                ts.isCallExpression(transformedElement.expression) &&
+                                ts.isIdentifier(transformedElement.expression.expression) &&
+                                transformedElement.expression.expression.text === "createStaticElement") {
                                 transformationTracker.needsRuntimeImport = true;
                                 if (debug) {
                                     console.log(`Transformed ${tagName} JSX element to use createStaticElement - setting needsRuntimeImport=true`);
                                 }
                             } else {
                                 if (debug) {
-                                    console.log(`JSX element ${tagName} was not transformed (not a JSX expression)`);
+                                    console.log(`JSX element ${tagName} was not transformed (not a createStaticElement JSX expression)`);
                                 }
                             }
                             return ts.visitEachChild(transformedElement, visitNode, context);
