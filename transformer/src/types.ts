@@ -34,4 +34,8 @@ export interface OptimizationContext {
     blockFunctions: Map<string, ts.FunctionDeclaration>;
     staticPropsTables: Map<string, PropInfo[]>;
     blockAnalyzer?: BlockAnalyzer;
+    /** Set of function/component names that should be skipped due to @undecillion decorator */
+    skipTransformFunctions: Set<string>;
+    /** Stack of current function context to track if we're inside a skip function */
+    functionContextStack: string[];
 }

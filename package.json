@@ -7,12 +7,9 @@
         "build:demo": "cd demo && npm run build",
         "build:runtime": "cd runtime && npm run build && cd .. && npm run copy-runtime",
         "build:transformer": "cd transformer && npm run build",
+        "test:transformer": "cd transformer && npm test",
         "copy-runtime": "node copy-runtime.js",
         "dev": "concurrently --prefix none \"cd demo && npm run dev\" \"cd runtime && npm run dev\" \"cd transformer && npm run dev\"",
-        "test": "vitest",
-        "test:run": "vitest run",
-        "test:watch": "vitest watch",
-        "test:coverage": "vitest run --coverage",
         "lint": "eslint src --ext .ts,.tsx",
         "lint:fix": "eslint src --ext .ts,.tsx --fix",
         "prepublishOnly": "npm run build"

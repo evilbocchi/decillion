@@ -49,7 +49,9 @@ export class DecillionTransformer {
             generatedBlocks: new Set<string>(),
             blockFunctions: new Map<string, ts.FunctionDeclaration>(),
             staticPropsTables: new Map<string, PropInfo[]>(),
-            blockAnalyzer
+            blockAnalyzer,
+            skipTransformFunctions: new Set<string>(),
+            functionContextStack: []
         };
     }
 
@@ -380,4 +382,122 @@ function isStaticExpression(expr: ts.Expression): boolean {
     }
 
     return false;
+}
+
+/**
+ * Utility functions for @undecillion decorator detection
+ */
+
+/**
+ * Checks if a function has the @undecillion decorator or comment
+ */
+export function hasUndecillionDecorator(node: ts.FunctionDeclaration | ts.FunctionExpression | ts.ArrowFunction | ts.MethodDeclaration): boolean {
+    // Get the source file and text
+    const sourceFile = node.getSourceFile();
+    if (!sourceFile) {
+        return false;
+    }
+
+    const fullText = sourceFile.getFullText();
+    
+    // For arrow functions, we need to find the top-level statement that contains the comment
+    let checkNode: ts.Node = node;
+    if (ts.isArrowFunction(node)) {
+        // Navigate up to find the VariableStatement which contains the leading comments
+        let parent = node.parent;
+        if (ts.isVariableDeclaration(parent)) {
+            parent = parent.parent; // VariableDeclarationList
+            if (ts.isVariableDeclarationList(parent)) {
+                parent = parent.parent; // VariableStatement
+                if (ts.isVariableStatement(parent)) {
+                    checkNode = parent;
+                }
+            }
+        }
+    }
+    
+    // Get the start position of the node (including leading trivia like comments)
+    const nodeStart = checkNode.getFullStart();
+    const nodePos = checkNode.getStart(sourceFile);
+    
+    // Look for @undecillion in the text before the actual node start
+    const textBeforeNode = fullText.substring(nodeStart, nodePos);
+    
+    // Also check a reasonable amount of text before the full start
+    const contextStart = Math.max(0, nodeStart - 500); // Look back up to 500 characters
+    const contextText = fullText.substring(contextStart, nodePos);
+    
+    // Check if @undecillion appears in comments before the function
+    const hasUndecillionMarker = contextText.includes('@undecillion') || textBeforeNode.includes('@undecillion');
+    
+    if (hasUndecillionMarker) {
+        // Ensure it's in a comment context, not just random text
+        const lines = contextText.split('\n');
+        
+        for (let i = lines.length - 1; i >= 0; i--) {
+            const line = lines[i].trim();
+            
+            // Check if this line contains @undecillion in a comment context
+            if (line.includes('@undecillion')) {
+                // Verify it's in a comment (starts with //, /*, or is part of JSDoc)
+                if (line.startsWith('//') || 
+                    line.startsWith('/*') || 
+                    line.startsWith('*') ||
+                    line.includes('* @undecillion') ||
+                    line.match(/^\s*@undecillion/)) {
+                    return true;
+                }
+            }
+            
+            // Stop searching if we hit actual code (non-comment, non-whitespace)
+            if (line && 
+                !line.startsWith('//') && 
+                !line.startsWith('/*') && 
+                !line.startsWith('*') && 
+                !line.startsWith('@') &&
+                !line.match(/^\s*$/)) {
+                break;
+            }
+        }
+    }
+
+    return false;
+}
+
+/**
+ * Gets the function name for tracking purposes
+ */
+export function getFunctionName(node: ts.FunctionDeclaration | ts.FunctionExpression | ts.ArrowFunction | ts.MethodDeclaration): string | undefined {
+    if (ts.isFunctionDeclaration(node) && node.name) {
+        return node.name.text;
+    }
+    
+    if (ts.isMethodDeclaration(node) && ts.isIdentifier(node.name)) {
+        return node.name.text;
+    }
+    
+    // For function expressions and arrow functions, try to get name from variable declaration
+    if (!node.parent) {
+        return undefined;
+    }
+    
+    const parent = node.parent;
+    if (ts.isVariableDeclaration(parent) && ts.isIdentifier(parent.name)) {
+        return parent.name.text;
+    }
+    
+    if (ts.isPropertyAssignment(parent) && ts.isIdentifier(parent.name)) {
+        return parent.name.text;
+    }
+    
+    return undefined;
+}
+
+/**
+ * Checks if we're currently inside a function that should skip transformation
+ */
+export function shouldSkipTransformation(context: OptimizationContext): boolean {
+    return context.functionContextStack.some(functionName => 
+        context.skipTransformFunctions.has(functionName)
+    );
 }

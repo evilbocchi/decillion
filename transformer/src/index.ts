@@ -1,6 +1,6 @@
 import * as ts from "typescript";
 import { BlockAnalyzer } from "./analyzer";
-import { DecillionTransformer, transformJsxElement } from "./transformer";
+import { DecillionTransformer, transformJsxElement, hasUndecillionDecorator, getFunctionName, shouldSkipTransformation } from "./transformer";
 import type { OptimizationContext, PropInfo } from "./types";
 
 /**
@@ -49,10 +49,67 @@ export default function (program: ts.Program, options: DecillionTransformerOptio
 
             let needsRuntimeImport = false;
 
+            // First pass: scan for functions with @undecillion decorator
+            const scanVisitor = (node: ts.Node): void => {
+                if (ts.isFunctionDeclaration(node) || 
+                    ts.isFunctionExpression(node) || 
+                    ts.isArrowFunction(node) || 
+                    ts.isMethodDeclaration(node)) {
+                    
+                    if (hasUndecillionDecorator(node)) {
+                        const functionName = getFunctionName(node);
+                        if (functionName) {
+                            optimizationContext.skipTransformFunctions.add(functionName);
+                            if (debug) {
+                                console.log(`Found @undecillion decorator on function: ${functionName}`);
+                            }
+                        }
+                    }
+                }
+                
+                ts.forEachChild(node, scanVisitor);
+            };
+
+            // Scan the file first
+            scanVisitor(file);
+
             // Main visitor function
             const visitNode = (node: ts.Node): ts.Node => {
+                // Track function context for @undecillion detection
+                if (ts.isFunctionDeclaration(node) || 
+                    ts.isFunctionExpression(node) || 
+                    ts.isArrowFunction(node) || 
+                    ts.isMethodDeclaration(node)) {
+                    
+                    const functionName = getFunctionName(node);
+                    
+                    // Push function context
+                    if (functionName) {
+                        optimizationContext.functionContextStack.push(functionName);
+                    }
+                    
+                    // Visit children with updated context
+                    const result = ts.visitEachChild(node, visitNode, context);
+                    
+                    // Pop function context
+                    if (functionName) {
+                        optimizationContext.functionContextStack.pop();
+                    }
+                    
+                    return result;
+                }
+
                 // Transform JSX elements using the new modular system
                 if (ts.isJsxElement(node) || ts.isJsxSelfClosingElement(node)) {
+                    // Check if we should skip transformation for this JSX element
+                    if (shouldSkipTransformation(optimizationContext)) {
+                        if (debug) {
+                            console.log(`Skipping JSX transformation due to @undecillion decorator: ${getTagName(node)}`);
+                        }
+                        // Return the original JSX node without transformation
+                        return ts.visitEachChild(node, visitNode, context);
+                    }
+
                     if (debug) {
                         console.log(`Found JSX element: ${getTagName(node)}`);
                     }

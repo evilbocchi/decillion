@@ -7,6 +7,6 @@ return {
 	react = React,
 	reactRoblox = ReactRoblox,
 	story = function()
-		return React.createElement(Counter, nil)
+		return React.createElement(Counter)
 	end,
 }
