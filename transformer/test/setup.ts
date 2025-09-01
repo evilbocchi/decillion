@@ -1,9 +1,15 @@
 // Global test setup
 import 'vitest';
 
-declare global {
-    var React: any;
-}
+// Mock React for runtime tests
+const mockReact = {
+    createElement: (type: any, props: any, ...children: any[]) => ({
+        type, props, children,
+        $$typeof: Symbol.for('react.element')
+    })
+};
+(globalThis as any).React = mockReact;
+export type React = typeof mockReact;
 
 // Mock UDim2
 class MockUDim2 {
@@ -84,16 +90,6 @@ class MockColor3 {
         return new MockColor3(r + m, g + m, b + m);
     }
 }
-
-// Mock React for runtime tests
-(globalThis as any).React = {
-    createElement: (type: any, props: any, ...children: any[]) => ({
-        type, props, children,
-        $$typeof: Symbol.for('react.element')
-    })
-};
-
-
 
 // Assign mocks to global objects
 (globalThis as any).UDim2 = MockUDim2;

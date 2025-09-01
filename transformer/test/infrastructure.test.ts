@@ -1,4 +1,5 @@
 /// <reference types="@rbxts/types" />
+/// <reference types="./globals.d.ts" />
 import { describe, expect, it } from 'vitest';
 
 describe('Test Infrastructure', () => {
