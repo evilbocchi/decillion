@@ -20,6 +20,8 @@ class RobloxStaticDetector {
     private visitedFiles = new Set<string>();
     private currentRbxtsVersion?: string;
     private cacheFilePath?: string;
+    // Store interfaces for later lookup
+    private interfaceDeclarations = new Map<string, ts.InterfaceDeclaration>();
 
     /**
      * Initialize the detector by parsing roblox.d.ts and all referenced files
@@ -29,6 +31,7 @@ class RobloxStaticDetector {
 
         // Clear visited files cache for fresh initialization
         this.visitedFiles.clear();
+        this.interfaceDeclarations.clear();
 
         // Get @rbxts/types version for caching
         this.currentRbxtsVersion = this.getRbxtsVersion(program);
@@ -49,7 +52,7 @@ class RobloxStaticDetector {
         if (!robloxDTs) {
             throw new Error('Could not create source file for roblox.d.ts');
         }
-        
+
 
         // Parse the main roblox.d.ts file
         this.parseRbxtsDts(robloxDTs);
@@ -79,18 +82,18 @@ class RobloxStaticDetector {
         try {
             const currentDir = program.getCurrentDirectory();
             const packageJsonPath = this.findPackageJson(currentDir);
-            
+
             if (!packageJsonPath || !fs.existsSync(packageJsonPath)) {
                 return undefined;
             }
 
             const packageJsonContent = fs.readFileSync(packageJsonPath, 'utf-8');
             const packageJson = JSON.parse(packageJsonContent);
-            
+
             // Check both dependencies and devDependencies
-            const version = packageJson.dependencies?.['@rbxts/types'] || 
-                          packageJson.devDependencies?.['@rbxts/types'];
-            
+            const version = packageJson.dependencies?.['@rbxts/types'] ||
+                packageJson.devDependencies?.['@rbxts/types'];
+
             return version;
         } catch (error) {
             console.warn('Failed to read @rbxts/types version:', error);
@@ -103,7 +106,7 @@ class RobloxStaticDetector {
      */
     private findPackageJson(dir: string): string | undefined {
         let currentDir = dir;
-        
+
         while (currentDir !== path.dirname(currentDir)) {
             const packageJsonPath = path.join(currentDir, 'package.json');
             if (fs.existsSync(packageJsonPath)) {
@@ -111,7 +114,7 @@ class RobloxStaticDetector {
             }
             currentDir = path.dirname(currentDir);
         }
-        
+
         return undefined;
     }
 
@@ -121,12 +124,12 @@ class RobloxStaticDetector {
     private getCacheFilePath(program: ts.Program): string {
         const currentDir = program.getCurrentDirectory();
         const cacheDir = path.join(currentDir, 'node_modules', '.cache', 'decillion');
-        
+
         // Ensure cache directory exists
         if (!fs.existsSync(cacheDir)) {
             fs.mkdirSync(cacheDir, { recursive: true });
         }
-        
+
         return path.join(cacheDir, 'roblox-static-cache.json');
     }
 
@@ -153,12 +156,12 @@ class RobloxStaticDetector {
 
             // Load cached data
             this.staticConstructors = new Set(cacheData.staticConstructors);
-            
+
             this.staticMethods.clear();
             for (const [key, values] of Object.entries(cacheData.staticMethods)) {
                 this.staticMethods.set(key, new Set(values));
             }
-            
+
             this.staticProperties.clear();
             for (const [key, values] of Object.entries(cacheData.staticProperties)) {
                 this.staticProperties.set(key, new Set(values));
@@ -205,12 +208,12 @@ class RobloxStaticDetector {
 
         // Normalize the file path to prevent duplicate processing
         const normalizedPath = path.resolve(sourceFile.fileName);
-        
+
         // Skip if we've already visited this file to prevent circular references
         if (this.visitedFiles.has(normalizedPath)) {
             return;
         }
-        
+
         // Mark this file as visited
         this.visitedFiles.add(normalizedPath);
 
@@ -274,13 +277,27 @@ class RobloxStaticDetector {
      * Parse a rbxts built-in declaration file to extract static constructors and methods
      */
     private parseRbxtsDts(sourceFile: ts.SourceFile): void {
+        // First pass: collect all interface declarations
+        this.collectInterfaces(sourceFile);
+
+        // Second pass: parse for static members and constructor patterns
         const visit = (node: ts.Node) => {
             // Look for interface or class declarations
             if (ts.isInterfaceDeclaration(node) || ts.isClassDeclaration(node)) {
                 const typeName = node.name?.text;
                 if (!typeName) return;
 
+                // Skip constructor interfaces - they'll be handled via declare const statements
+                if (typeName.endsWith('Constructor')) {
+                    return;
+                }
+
                 this.parseDataTypeMembers(node, typeName);
+            }
+
+            // Look for declare const statements that link to constructor interfaces
+            if (ts.isVariableStatement(node)) {
+                this.parseVariableStatement(node);
             }
 
             // Look for namespace declarations (like Enum)
@@ -294,6 +311,19 @@ class RobloxStaticDetector {
             ts.forEachChild(node, visit);
         };
 
+        visit(sourceFile);
+    }
+
+    /**
+     * First pass: collect all interface declarations for later lookup
+     */
+    private collectInterfaces(sourceFile: ts.SourceFile): void {
+        const visit = (node: ts.Node) => {
+            if (ts.isInterfaceDeclaration(node) && node.name) {
+                this.interfaceDeclarations.set(node.name.text, node);
+            }
+            ts.forEachChild(node, visit);
+        };
         visit(sourceFile);
     }
 
@@ -327,6 +357,70 @@ class RobloxStaticDetector {
 
         // Mark as having constructor if it's a known constructible type
         this.staticConstructors.add(typeName);
+    }
+
+    /**
+     * Parse variable statements to find declare const patterns like `declare const Color3: Color3Constructor`
+     */
+    private parseVariableStatement(node: ts.VariableStatement): void {
+        if (!node.declarationList || !node.declarationList.declarations) return;
+
+        for (const declaration of node.declarationList.declarations) {
+            if (!ts.isVariableDeclaration(declaration) || !declaration.name || !ts.isIdentifier(declaration.name)) {
+                continue;
+            }
+
+            const varName = declaration.name.text;
+            const typeRef = declaration.type;
+
+            // Look for type references to constructor interfaces
+            if (typeRef && ts.isTypeReferenceNode(typeRef) && ts.isIdentifier(typeRef.typeName)) {
+                const constructorInterfaceName = typeRef.typeName.text;
+
+                // Check if this is a constructor interface pattern (e.g., Color3Constructor)
+                if (constructorInterfaceName.endsWith('Constructor')) {
+                    // Find the constructor interface declaration
+                    this.parseConstructorInterface(varName, constructorInterfaceName);
+                }
+            }
+        }
+    }
+
+    /**
+     * Parse a constructor interface to extract static methods and properties
+     */
+    private parseConstructorInterface(typeName: string, constructorInterfaceName: string): void {
+        // Mark it as having a constructor
+        this.staticConstructors.add(typeName);
+
+        // Find the constructor interface declaration
+        const constructorInterface = this.interfaceDeclarations.get(constructorInterfaceName);
+        if (!constructorInterface || !constructorInterface.members) {
+            return;
+        }
+
+        // Parse the constructor interface members as static methods/properties
+        for (const member of constructorInterface.members) {
+            if (ts.isMethodSignature(member) || ts.isPropertySignature(member)) {
+                const memberName = member.name && ts.isIdentifier(member.name) ? member.name.text : undefined;
+                if (!memberName) continue;
+
+                // Constructor interface members become static methods/properties
+                if (ts.isMethodSignature(member) || (ts.isPropertySignature(member) && member.type && ts.isFunctionTypeNode(member.type))) {
+                    // It's a method (either method signature or property with function type)
+                    if (!this.staticMethods.has(typeName)) {
+                        this.staticMethods.set(typeName, new Set());
+                    }
+                    this.staticMethods.get(typeName)!.add(memberName);
+                } else {
+                    // It's a property
+                    if (!this.staticProperties.has(typeName)) {
+                        this.staticProperties.set(typeName, new Set());
+                    }
+                    this.staticProperties.get(typeName)!.add(memberName);
+                }
+            }
+        }
     }
 
     /**
