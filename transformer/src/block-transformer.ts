@@ -1,45 +1,40 @@
+import { transformJsxElement } from "transformer";
+import { OptimizationContext, PropInfo } from "types";
 import * as ts from "typescript";
-import { BlockAnalyzer, BlockInfo } from "./block-analyzer";
+import { BlockAnalyzer } from "./block-analyzer";
 
 /**
- * Transforms JSX elements into optimized block-memoized code
+ * Legacy wrapper for block transformation
+ * @deprecated Use the new modular block system instead
  */
 export class BlockTransformer {
-    private generatedBlocks = new Set<string>();
-    private blockFunctions = new Map<string, ts.FunctionDeclaration>();
-    private staticPropsTables = new Map<string, Array<{ name: string; value: ts.Expression; }>>();
+    private context: OptimizationContext;
 
     constructor(
         private typeChecker: ts.TypeChecker,
-        private context: ts.TransformationContext,
+        private transformationContext: ts.TransformationContext,
         private analyzer: BlockAnalyzer
-    ) { }
+    ) {
+        this.context = {
+            typeChecker,
+            context: transformationContext,
+            blockCounter: 0,
+            generatedBlocks: new Set<string>(),
+            blockFunctions: new Map<string, ts.FunctionDeclaration>(),
+            staticPropsTables: new Map<string, PropInfo[]>()
+        };
+    }
 
     /**
      * Transforms a JSX element into an optimized block call
      */
     transformJsxElement(node: ts.JsxElement | ts.JsxSelfClosingElement): ts.Node {
         try {
-            const blockInfo = this.analyzer.analyzeJsxElement(node);
-
-            // If it's completely static, generate static element
-            if (blockInfo.isStatic) {
-                return this.generateStaticElement(node);
-            }
-
-            // If it should be memoized, generate memoized block
-            if (this.analyzer.shouldMemoizeBlock(blockInfo)) {
-                return this.generateMemoizedBlock(node, blockInfo);
-            }
-
-            // Otherwise, generate optimized element  
-            return this.generateOptimizedElement(node, blockInfo);
+            const result = transformJsxElement(node, this.context);
+            return result.element;
         } catch (error) {
             // If transformation fails, return original node as fallback
             console.warn(`Failed to transform JSX element: ${error}`);
-            if (error instanceof Error) {
-                console.warn(`Error stack: ${error.stack}`);
-            }
             return node;
         }
     }
@@ -58,389 +53,13 @@ export class BlockTransformer {
             // For now, we'll focus on optimizing the JSX content itself
             // The individual JSX elements will be handled by transformJsxElement
             // Future enhancement: Add React.memo equivalent for component-level memoization
-            
+
             return this.addComponentOptimizations(node);
         } catch (error) {
             // If transformation fails, return undefined to use original component
             console.warn(`Failed to transform component: ${error}`);
             return undefined;
         }
-    }
-
-    /**
-     * Generates code for a completely static element
-     */
-    private generateStaticElement(node: ts.JsxElement | ts.JsxSelfClosingElement): ts.Expression {
-        // For static elements, we use createStaticElement for optimization
-        const tagName = this.analyzer.getJsxTagName(node);
-        const props = this.extractStaticProps(node);
-        const children = this.extractStaticChildren(node);
-
-        // Create props object or use undefined if no props
-        let propsArg: ts.Expression;
-        if (props.length > 0) {
-            // Generate a unique identifier for this static props table
-            const propsId = `STATIC_PROPS_${tagName.toUpperCase()}_${Math.random().toString(36).substr(2, 6)}`;
-            
-            // Store the props object for later insertion at module level
-            this.addStaticPropsTable(propsId, props);
-            
-            // Reference the static props table
-            propsArg = ts.factory.createIdentifier(propsId);
-        } else {
-            propsArg = ts.factory.createIdentifier("undefined");
-        }
-
-        return ts.factory.createCallExpression(
-            ts.factory.createIdentifier("createStaticElement"),
-            undefined,
-            [
-                ts.factory.createStringLiteral(tagName),
-                propsArg,
-                ...children
-            ]
-        );
-    }
-
-    /**
-     * Generates a memoized block with shouldUpdate logic
-     */
-    private generateMemoizedBlock(node: ts.JsxElement | ts.JsxSelfClosingElement, blockInfo: BlockInfo): ts.Expression {
-        const blockFunctionName = `${blockInfo.id}_block`;
-
-        // Generate the block function if not already generated
-        if (!this.generatedBlocks.has(blockInfo.id)) {
-            this.generateBlockFunction(node, blockInfo, blockFunctionName);
-            this.generatedBlocks.add(blockInfo.id);
-        }
-
-        // Create parameters with proper type annotations for the arrow function
-        const arrowFunctionParams = blockInfo.dependencies.map(dep => {
-            let typeNode: ts.TypeNode | undefined;
-            
-            // Common Roblox types we can infer
-            if (dep === 'Color3') {
-                typeNode = ts.factory.createTypeReferenceNode(
-                    ts.factory.createIdentifier('Color3Constructor'),
-                    undefined
-                );
-            } else if (dep === 'UDim2') {
-                typeNode = ts.factory.createTypeReferenceNode(
-                    ts.factory.createIdentifier('UDim2Constructor'),
-                    undefined
-                );
-            } else if (dep === 'Vector2' || dep === 'Vector3') {
-                typeNode = ts.factory.createTypeReferenceNode(
-                    ts.factory.createIdentifier(dep + 'Constructor'),
-                    undefined
-                );
-            } else if (dep.includes('count') || dep.includes('number') || dep.includes('size') || dep.includes('position')) {
-                typeNode = ts.factory.createKeywordTypeNode(ts.SyntaxKind.NumberKeyword);
-            } else if (dep.includes('text') || dep.includes('name') || dep.includes('title')) {
-                typeNode = ts.factory.createKeywordTypeNode(ts.SyntaxKind.StringKeyword);
-            } else if (dep.includes('visible') || dep.includes('enabled') || dep.includes('active')) {
-                typeNode = ts.factory.createKeywordTypeNode(ts.SyntaxKind.BooleanKeyword);
-            } else if (dep.includes('ment') || dep.includes('click') || dep.includes('handler') || dep.endsWith('ment') || dep.includes('callback')) {
-                // Function dependencies (event handlers like increment, decrement)
-                typeNode = ts.factory.createFunctionTypeNode(
-                    undefined,
-                    [],
-                    ts.factory.createKeywordTypeNode(ts.SyntaxKind.VoidKeyword)
-                );
-            } else {
-                typeNode = ts.factory.createKeywordTypeNode(ts.SyntaxKind.AnyKeyword);
-            }
-            
-            return ts.factory.createParameterDeclaration(
-                undefined,
-                undefined,
-                ts.factory.createIdentifier(dep),
-                undefined,
-                typeNode,
-                undefined
-            );
-        });
-
-        // Create a call to useMemoizedBlock with proper parameters
-        return ts.factory.createCallExpression(
-            ts.factory.createIdentifier("useMemoizedBlock"),
-            undefined,
-            [
-                // Arrow function that calls the block function
-                ts.factory.createArrowFunction(
-                    undefined,
-                    undefined,
-                    arrowFunctionParams,
-                    undefined,
-                    ts.factory.createToken(ts.SyntaxKind.EqualsGreaterThanToken),
-                    ts.factory.createCallExpression(
-                        ts.factory.createIdentifier(blockFunctionName),
-                        undefined,
-                        blockInfo.dependencies.map(dep => ts.factory.createIdentifier(dep))
-                    )
-                ),
-                this.createDependenciesArray(blockInfo.dependencies),
-                ts.factory.createStringLiteral(blockInfo.id)
-            ]
-        );
-    }
-
-    /**
-     * Generates optimized element with selective child optimization
-     */
-    private generateOptimizedElement(node: ts.JsxElement | ts.JsxSelfClosingElement, blockInfo: BlockInfo): ts.Expression {
-        const tagName = this.analyzer.getJsxTagName(node);
-        const props = this.extractAllProps(node);
-        const children = this.extractOptimizedChildren(node);
-
-        // Create props object or use undefined if no props
-        const propsArg = props.length > 0 ? 
-            this.createPropsObject(props) : 
-            ts.factory.createIdentifier("undefined");
-
-        return ts.factory.createCallExpression(
-            ts.factory.createPropertyAccessExpression(
-                ts.factory.createIdentifier("React"),
-                ts.factory.createIdentifier("createElement")
-            ),
-            undefined,
-            [
-                ts.factory.createStringLiteral(tagName),
-                propsArg,
-                ...children
-            ]
-        );
-    }
-
-    /**
-     * Generates a block function with memoization logic
-     */
-    private generateBlockFunction(
-        node: ts.JsxElement | ts.JsxSelfClosingElement,
-        blockInfo: BlockInfo,
-        functionName: string
-    ): void {
-        const tagName = this.analyzer.getJsxTagName(node);
-        const props = this.extractAllProps(node);
-        const children = this.extractOptimizedChildren(node);
-
-        // Create parameters for dependencies with proper type annotations
-        const parameters = blockInfo.dependencies.map(dep => {
-            // Infer type from the dependency name or use 'any' as fallback
-            let typeNode: ts.TypeNode | undefined;
-            
-            // Common Roblox types we can infer
-            if (dep === 'Color3') {
-                typeNode = ts.factory.createTypeReferenceNode(
-                    ts.factory.createIdentifier('Color3Constructor'),
-                    undefined
-                );
-            } else if (dep === 'UDim2') {
-                typeNode = ts.factory.createTypeReferenceNode(
-                    ts.factory.createIdentifier('UDim2Constructor'),
-                    undefined
-                );
-            } else if (dep === 'Vector2' || dep === 'Vector3') {
-                typeNode = ts.factory.createTypeReferenceNode(
-                    ts.factory.createIdentifier(dep + 'Constructor'),
-                    undefined
-                );
-            } else if (dep.includes('count') || dep.includes('number') || dep.includes('size') || dep.includes('position')) {
-                // Numeric dependencies
-                typeNode = ts.factory.createKeywordTypeNode(ts.SyntaxKind.NumberKeyword);
-            } else if (dep.includes('text') || dep.includes('name') || dep.includes('title')) {
-                // String dependencies
-                typeNode = ts.factory.createKeywordTypeNode(ts.SyntaxKind.StringKeyword);
-            } else if (dep.includes('visible') || dep.includes('enabled') || dep.includes('active')) {
-                // Boolean dependencies
-                typeNode = ts.factory.createKeywordTypeNode(ts.SyntaxKind.BooleanKeyword);
-            } else if (dep.includes('ment') || dep.includes('click') || dep.includes('handler') || dep.endsWith('ment') || dep.includes('callback')) {
-                // Function dependencies (event handlers like increment, decrement)
-                typeNode = ts.factory.createFunctionTypeNode(
-                    undefined,
-                    [],
-                    ts.factory.createKeywordTypeNode(ts.SyntaxKind.VoidKeyword)
-                );
-            } else {
-                // For other dependencies, try to infer from context or use any
-                typeNode = ts.factory.createKeywordTypeNode(ts.SyntaxKind.AnyKeyword);
-            }
-            
-            return ts.factory.createParameterDeclaration(
-                undefined,
-                undefined,
-                ts.factory.createIdentifier(dep),
-                undefined,
-                typeNode,
-                undefined
-            );
-        });
-
-        // Create the block function body
-        const blockBody = ts.factory.createBlock([
-            ts.factory.createReturnStatement(
-                ts.factory.createCallExpression(
-                    ts.factory.createPropertyAccessExpression(
-                        ts.factory.createIdentifier("React"),
-                        ts.factory.createIdentifier("createElement")
-                    ),
-                    undefined,
-                    [
-                        ts.factory.createStringLiteral(tagName),
-                        props.length > 0 ? this.createPropsObject(props) : ts.factory.createIdentifier("undefined"),
-                        ...children
-                    ]
-                )
-            )
-        ]);
-
-        const blockFunction = ts.factory.createFunctionDeclaration(
-            undefined,
-            undefined,
-            ts.factory.createIdentifier(functionName),
-            undefined,
-            parameters,
-            undefined,
-            blockBody
-        );
-
-        this.blockFunctions.set(blockInfo.id, blockFunction);
-    }
-
-    /**
-     * Extracts static props from JSX element
-     */
-    private extractStaticProps(node: ts.JsxElement | ts.JsxSelfClosingElement): Array<{ name: string; value: ts.Expression; }> {
-        const props: Array<{ name: string; value: ts.Expression; }> = [];
-        const attributes = this.getJsxAttributes(node);
-
-        for (const attr of attributes) {
-            if (ts.isJsxAttribute(attr) && attr.initializer) {
-                const propName = ts.isIdentifier(attr.name) ? attr.name.text : attr.name.getText();
-
-                if (ts.isStringLiteral(attr.initializer)) {
-                    // String literal props are static
-                    props.push({ name: propName, value: attr.initializer });
-                } else if (ts.isJsxExpression(attr.initializer) && attr.initializer.expression) {
-                    // Check if the JSX expression contains a static value
-                    if (this.isStaticExpression(attr.initializer.expression)) {
-                        props.push({ name: propName, value: attr.initializer.expression });
-                    }
-                }
-            }
-        }
-
-        return props;
-    }
-
-    /**
-     * Extracts all props (static + dynamic) from JSX element
-     */
-    private extractAllProps(node: ts.JsxElement | ts.JsxSelfClosingElement): Array<{ name: string; value: ts.Expression; }> {
-        const props: Array<{ name: string; value: ts.Expression; }> = [];
-        const attributes = this.getJsxAttributes(node);
-
-        for (const attr of attributes) {
-            if (ts.isJsxAttribute(attr) && attr.initializer) {
-                const propName = ts.isIdentifier(attr.name) ? attr.name.text : attr.name.getText();
-
-                if (ts.isJsxExpression(attr.initializer) && attr.initializer.expression) {
-                    props.push({ name: propName, value: attr.initializer.expression });
-                } else if (ts.isStringLiteral(attr.initializer)) {
-                    props.push({ name: propName, value: attr.initializer });
-                }
-            }
-        }
-
-        return props;
-    }
-
-    /**
-     * Extracts static children from JSX element
-     */
-    private extractStaticChildren(node: ts.JsxElement | ts.JsxSelfClosingElement): ts.Expression[] {
-        if (!ts.isJsxElement(node)) {
-            return [];
-        }
-
-        const children: ts.Expression[] = [];
-
-        for (const child of node.children) {
-            if (ts.isJsxText(child)) {
-                const text = child.text.trim();
-                if (text) {
-                    children.push(ts.factory.createStringLiteral(text));
-                }
-            } else if (ts.isJsxElement(child) || ts.isJsxSelfClosingElement(child)) {
-                const childBlockInfo = this.analyzer.getBlockInfo(child);
-                if (childBlockInfo?.isStatic) {
-                    children.push(this.generateStaticElement(child));
-                }
-            }
-        }
-
-        return children;
-    }
-
-    /**
-     * Extracts and optimizes children from JSX element
-     */
-    private extractOptimizedChildren(node: ts.JsxElement | ts.JsxSelfClosingElement): ts.Expression[] {
-        if (!ts.isJsxElement(node)) {
-            return [];
-        }
-
-        const children: ts.Expression[] = [];
-
-        for (const child of node.children) {
-            if (ts.isJsxText(child)) {
-                const text = child.text.trim();
-                if (text) {
-                    children.push(ts.factory.createStringLiteral(text));
-                }
-            } else if (ts.isJsxElement(child) || ts.isJsxSelfClosingElement(child)) {
-                children.push(this.transformJsxElement(child) as ts.Expression);
-            } else if (ts.isJsxExpression(child) && child.expression) {
-                children.push(child.expression);
-            }
-        }
-
-        return children;
-    }
-
-    /**
-     * Creates a props object from prop array
-     */
-    private createPropsObject(props: Array<{ name: string; value: ts.Expression; }>): ts.ObjectLiteralExpression {
-        const properties = props.map(prop =>
-            ts.factory.createPropertyAssignment(
-                ts.factory.createIdentifier(prop.name),
-                prop.value
-            )
-        );
-
-        return ts.factory.createObjectLiteralExpression(properties, true);
-    }
-
-    /**
-     * Creates dependencies array for memoization
-     */
-    private createDependenciesArray(dependencies: string[]): ts.ArrayLiteralExpression {
-        const elements = dependencies.map(dep =>
-            ts.factory.createIdentifier(dep)
-        );
-
-        return ts.factory.createArrayLiteralExpression(elements, false);
-    }
-
-    /**
-     * Gets JSX attributes from either JsxElement or JsxSelfClosingElement
-     */
-    private getJsxAttributes(node: ts.JsxElement | ts.JsxSelfClosingElement): ts.NodeArray<ts.JsxAttributeLike> {
-        if (ts.isJsxElement(node)) {
-            return node.openingElement.attributes.properties;
-        }
-        return node.attributes.properties;
     }
 
     /**
@@ -471,87 +90,18 @@ export class BlockTransformer {
     }
 
     hasGeneratedBlocks(): boolean {
-        return this.generatedBlocks.size > 0;
+        return this.context.generatedBlocks.size > 0;
     }
 
     getBlockFunctions(): Map<string, ts.FunctionDeclaration> {
-        return this.blockFunctions;
+        return this.context.blockFunctions;
     }
 
     hasStaticPropsTables(): boolean {
-        return this.staticPropsTables.size > 0;
+        return this.context.staticPropsTables.size > 0;
     }
 
-    getStaticPropsTables(): Map<string, Array<{ name: string; value: ts.Expression; }>> {
-        return this.staticPropsTables;
-    }
-
-    /**
-     * Adds a static props table for later insertion at module level
-     */
-    private addStaticPropsTable(id: string, props: Array<{ name: string; value: ts.Expression; }>): void {
-        this.staticPropsTables.set(id, props);
-    }
-
-    /**
-     * Helper function to check if an expression is static
-     */
-    private isStaticExpression(expr: ts.Expression): boolean {
-        if (ts.isStringLiteral(expr) || ts.isNumericLiteral(expr) ||
-            ts.isBooleanLiteral(expr) || expr.kind === ts.SyntaxKind.NullKeyword) {
-            return true;
-        }
-
-        if (ts.isCallExpression(expr)) {
-            const callExpr = expr.expression;
-            // Allow certain known static calls (like Color3.fromRGB, UDim2.new, Vector2.new)
-            if (ts.isPropertyAccessExpression(callExpr)) {
-                const objName = ts.isIdentifier(callExpr.expression) ? callExpr.expression.text : "";
-                const methodName = ts.isIdentifier(callExpr.name) ? callExpr.name.text : "";
-
-                if ((objName === "Color3" && (methodName === "fromRGB" || methodName === "new")) ||
-                    (objName === "UDim2" && methodName === "new") ||
-                    (objName === "Vector2" && methodName === "new") ||
-                    (objName === "Vector3" && methodName === "new")) {
-                    // Check if all arguments are static
-                    return expr.arguments.every(arg => this.isStaticExpression(arg as ts.Expression));
-                }
-            }
-            
-            // Allow new expressions for Roblox constructors
-            if (ts.isIdentifier(callExpr)) {
-                const constructorName = callExpr.text;
-                if (constructorName === "Color3" || constructorName === "UDim2" || 
-                    constructorName === "Vector2" || constructorName === "Vector3") {
-                    return expr.arguments.every(arg => this.isStaticExpression(arg as ts.Expression));
-                }
-            }
-            
-            return false;
-        }
-
-        // Handle new expressions (new Color3(), new Vector2(), etc.)
-        if (ts.isNewExpression(expr)) {
-            if (ts.isIdentifier(expr.expression)) {
-                const constructorName = expr.expression.text;
-                if (constructorName === "Color3" || constructorName === "UDim2" || 
-                    constructorName === "Vector2" || constructorName === "Vector3") {
-                    return expr.arguments ? expr.arguments.every(arg => this.isStaticExpression(arg as ts.Expression)) : true;
-                }
-            }
-            return false;
-        }
-
-        if (ts.isTemplateExpression(expr)) {
-            // Template expressions with variables are dynamic
-            return false;
-        }
-
-        if (ts.isIdentifier(expr) || ts.isPropertyAccessExpression(expr)) {
-            // Variable references are dynamic
-            return false;
-        }
-
-        return false;
+    getStaticPropsTables(): Map<string, PropInfo[]> {
+        return this.context.staticPropsTables;
     }
 }

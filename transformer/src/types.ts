@@ -1,0 +1,37 @@
+import * as ts from "typescript";
+import type { BlockAnalyzer } from "./block-analyzer";
+
+/**
+ * Core types for block analysis and transformation
+ */
+
+export interface BlockInfo {
+    id: string;
+    staticProps: string[];
+    dynamicProps: string[];
+    hasDynamicChildren: boolean;
+    isStatic: boolean;
+    dependencies: string[];
+}
+
+export interface PropInfo {
+    name: string;
+    value: ts.Expression;
+    isStatic: boolean;
+}
+
+export interface TransformResult {
+    element: ts.Expression;
+    needsRuntimeImport: boolean;
+    staticPropsTable?: { id: string; props: PropInfo[] };
+}
+
+export interface OptimizationContext {
+    typeChecker: ts.TypeChecker;
+    context: ts.TransformationContext;
+    blockCounter: number;
+    generatedBlocks: Set<string>;
+    blockFunctions: Map<string, ts.FunctionDeclaration>;
+    staticPropsTables: Map<string, PropInfo[]>;
+    blockAnalyzer?: BlockAnalyzer;
+}
