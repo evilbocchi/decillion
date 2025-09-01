@@ -1,4 +1,3 @@
-import '@rbxts/types';
 import * as fs from "fs";
 import * as path from "path";
 import * as ts from "typescript";
@@ -13,87 +12,116 @@ class RobloxStaticDetector {
     private initialized = false;
 
     /**
-     * Initialize the detector by parsing roblox.d.ts
+     * Initialize the detector by parsing roblox.d.ts and all referenced files
      */
     initialize(program: ts.Program): void {
         if (this.initialized) return;
 
-        // Find roblox.d.ts in the program
-        const robloxDtsFile = this.findRobloxDts(program);
-        if (robloxDtsFile) {
-            this.parseRobloxDts(robloxDtsFile);
-        } else {
-            // Fallback to hardcoded knowledge when types aren't available
-            this.initializeFallbackMode();
+        const resolved = this.resolveRobloxDTs(program);
+        if (!resolved) {
+            throw new Error('Could not resolve @rbxts/types');
         }
+
+        const robloxDTs = this.createSourceFileFromPath(resolved.resolvedFileName);
+        if (!robloxDTs) {
+            throw new Error('Could not create source file for roblox.d.ts');
+        }
+
+        // Parse the main roblox.d.ts file
+        this.parseRbxtsDts(robloxDTs);
+
+        // Parse all referenced files
+        this.parseReferencedFiles(robloxDTs);
+
+        console.log(this.staticConstructors);
 
         this.initialized = true;
     }
 
-    /**
-     * Find roblox.d.ts file in the TypeScript program
-     */
-    private findRobloxDts(program: ts.Program): ts.SourceFile | undefined {
-        const sourceFiles = program.getSourceFiles();
-
-        for (const sourceFile of sourceFiles) {
-            if (sourceFile.fileName.includes('roblox.d.ts') ||
-                sourceFile.fileName.includes('@rbxts/types')) {
-                return sourceFile;
-            }
-        }
-
-        // Try to find it manually in node_modules
-        const compilerOptions = program.getCompilerOptions();
-        if (compilerOptions.typeRoots) {
-            for (const typeRoot of compilerOptions.typeRoots) {
-                const robloxPath = path.join(typeRoot, '@rbxts', 'types', 'include', 'roblox.d.ts');
-                if (fs.existsSync(robloxPath)) {
-                    const sourceFile = program.getSourceFile(robloxPath);
-                    if (sourceFile) return sourceFile;
+    private resolveRobloxDTs(program: ts.Program): ts.ResolvedModuleFull | undefined {
+        // Try multiple resolution strategies
+        const strategies = [
+            () => ts.resolveModuleName(
+                '@rbxts/types',
+                program.getCurrentDirectory(),
+                program.getCompilerOptions(),
+                ts.sys
+            ).resolvedModule,
+            
+            () => ts.resolveModuleName(
+                '@rbxts/types',
+                program.getCompilerOptions().baseUrl || process.cwd(),
+                program.getCompilerOptions(),
+                ts.sys
+            ).resolvedModule,
+            
+            // Try to find it relative to this file's location
+            () => {
+                const thisDir = __dirname;
+                const typesPath = path.resolve(thisDir, '../node_modules/@rbxts/types/include/roblox.d.ts');
+                if (fs.existsSync(typesPath)) {
+                    return {
+                        resolvedFileName: typesPath,
+                        extension: ts.Extension.Dts,
+                        isExternalLibraryImport: true
+                    } as ts.ResolvedModuleFull;
                 }
+                return undefined;
+            }
+        ];
+
+        for (const strategy of strategies) {
+            try {
+                const result = strategy();
+                if (result) {
+                    return result;
+                }
+            } catch (e) {
+                // Continue to next strategy
             }
         }
 
-        return this.resolveRobloxTypes(program);
+        return undefined;
     }
 
-    private resolveRobloxTypes(program: ts.Program): ts.SourceFile | undefined {
-        // Use ts.sys as the module resolution host
-        const resolved = ts.resolveModuleName(
-            '@rbxts/types',
-            program.getCurrentDirectory(),
-            program.getCompilerOptions(),
-            ts.sys
-        );
-
-        if (resolved.resolvedModule) {
-            const resolvedFileName = resolved.resolvedModule.resolvedFileName;
+    /**
+     * Parse all files referenced by triple-slash directives
+     */
+    private parseReferencedFiles(sourceFile: ts.SourceFile): void {
+        const baseDir = path.dirname(sourceFile.fileName);
+        
+        // Extract reference paths from the source file
+        const referencePaths = this.extractReferenceDirectives(sourceFile);
+        
+        for (const refPath of referencePaths) {
+            const resolvedPath = path.resolve(baseDir, refPath);
+            const referencedFile = this.createSourceFileFromPath(resolvedPath);
             
-            // First try to get it from the program
-            let sourceFile = program.getSourceFile(resolvedFileName);
-            if (sourceFile) {
-                return sourceFile;
-            }
-            
-            // If not in program, check if it's the main roblox.d.ts file we need
-            if (resolvedFileName.includes('roblox.d.ts')) {
-                return this.createSourceFileFromPath(resolvedFileName);
-            }
-            
-            // If it's the main @rbxts/types module, look for roblox.d.ts in the same directory
-            const robloxDtsPath = path.join(path.dirname(resolvedFileName), 'roblox.d.ts');
-            if (fs.existsSync(robloxDtsPath)) {
-                return this.createSourceFileFromPath(robloxDtsPath);
-            }
-            
-            // Try the include subdirectory
-            const includeRobloxPath = path.join(path.dirname(resolvedFileName), 'include', 'roblox.d.ts');
-            if (fs.existsSync(includeRobloxPath)) {
-                return this.createSourceFileFromPath(includeRobloxPath);
+            if (referencedFile) {
+                this.parseRbxtsDts(referencedFile);
+                
+                // Recursively parse any references in the referenced file
+                this.parseReferencedFiles(referencedFile);
             }
         }
-        return undefined;
+    }
+
+    /**
+     * Extract reference directive paths from a source file
+     */
+    private extractReferenceDirectives(sourceFile: ts.SourceFile): string[] {
+        const referencePaths: string[] = [];
+        const fullText = sourceFile.getFullText();
+        
+        // Match triple-slash reference directives
+        const referenceRegex = /\/\/\/\s*<reference\s+path="([^"]+)"\s*\/>/g;
+        let match;
+        
+        while ((match = referenceRegex.exec(fullText)) !== null) {
+            referencePaths.push(match[1]);
+        }
+        
+        return referencePaths;
     }
 
     /**
@@ -104,7 +132,7 @@ class RobloxStaticDetector {
             if (!fs.existsSync(filePath)) {
                 return undefined;
             }
-            
+
             const fileContent = fs.readFileSync(filePath, 'utf-8');
             return ts.createSourceFile(
                 filePath,
@@ -119,9 +147,9 @@ class RobloxStaticDetector {
     }
 
     /**
-     * Parse roblox.d.ts to extract static constructors and methods
+     * Parse a rbxts built-in declaration file to extract static constructors and methods
      */
-    private parseRobloxDts(sourceFile: ts.SourceFile): void {
+    private parseRbxtsDts(sourceFile: ts.SourceFile): void {
         const visit = (node: ts.Node) => {
             // Look for interface or class declarations
             if (ts.isInterfaceDeclaration(node) || ts.isClassDeclaration(node)) {
@@ -153,7 +181,7 @@ class RobloxStaticDetector {
      */
     private isRobloxDataType(typeName: string): boolean {
         // Common Roblox data types that have constructors
-        const dataTypePattern = /^(Color3|Vector[23]|UDim2?|CFrame|Ray|Region3|BrickColor|NumberRange|ColorSequence|NumberSequence|PathWaypoint|TweenInfo|Random)$/;
+        const dataTypePattern = /^(Color3|Vector[23]|Vector[23]int16|UDim2?|CFrame|Ray|Region3|BrickColor|NumberRange|ColorSequence|NumberSequence|PathWaypoint|TweenInfo|Random|DateTime|Font|Axes|Faces|FloatCurveKey|NumberSequenceKeypoint|ColorSequenceKeypoint|DockWidgetPluginGuiInfo|CatalogSearchParams|Content)$/;
         return dataTypePattern.test(typeName);
     }
 
@@ -171,7 +199,7 @@ class RobloxStaticDetector {
                 // Check if it's a static method
                 const isStatic = member.modifiers?.some(mod => mod.kind === ts.SyntaxKind.StaticKeyword);
 
-                if (isStatic || this.isKnownStaticMethod(typeName, memberName)) {
+                if (isStatic) {
                     if (!this.staticMethods.has(typeName)) {
                         this.staticMethods.set(typeName, new Set());
                     }
@@ -185,7 +213,7 @@ class RobloxStaticDetector {
 
                 const isStatic = member.modifiers?.some(mod => mod.kind === ts.SyntaxKind.StaticKeyword);
 
-                if (isStatic || this.isKnownStaticProperty(typeName, memberName)) {
+                if (isStatic) {
                     if (!this.staticProperties.has(typeName)) {
                         this.staticProperties.set(typeName, new Set());
                     }
@@ -195,9 +223,7 @@ class RobloxStaticDetector {
         }
 
         // Mark as having constructor if it's a known constructible type
-        if (this.isConstructibleType(typeName)) {
-            this.staticConstructors.add(typeName);
-        }
+        this.staticConstructors.add(typeName);
     }
 
     /**
@@ -214,122 +240,6 @@ class RobloxStaticDetector {
                 this.staticProperties.get('Enum')!.add(enumName);
             }
         }
-    }
-
-    /**
-     * Check if a method is known to be static (based on Roblox API knowledge)
-     */
-    private isKnownStaticMethod(typeName: string, methodName: string): boolean {
-        const knownStatic: Record<string, string[]> = {
-            'Color3': ['new', 'fromRGB', 'fromHSV', 'fromHex'],
-            'Vector2': ['new'],
-            'Vector3': ['new', 'FromNormalId', 'FromAxis'],
-            'UDim': ['new'],
-            'UDim2': ['new', 'fromScale', 'fromOffset'],
-            'CFrame': ['new', 'lookAt', 'fromAxisAngle', 'fromOrientation', 'fromEulerAnglesXYZ', 'fromEulerAnglesYXZ', 'fromMatrix', 'Angles'],
-            'Ray': ['new'],
-            'Region3': ['new'],
-            'BrickColor': ['new', 'palette', 'random', 'White', 'Gray', 'DarkGray', 'Black', 'Red', 'Yellow', 'Green', 'Blue'],
-            'NumberRange': ['new'],
-            'ColorSequence': ['new'],
-            'NumberSequence': ['new'],
-            'PathWaypoint': ['new'],
-            'TweenInfo': ['new'],
-            'Random': ['new']
-        };
-
-        return knownStatic[typeName]?.includes(methodName) || false;
-    }
-
-    /**
-     * Check if a property is known to be static
-     */
-    private isKnownStaticProperty(typeName: string, propertyName: string): boolean {
-        const knownStatic: Record<string, string[]> = {
-            'BrickColor': ['White', 'Gray', 'DarkGray', 'Black', 'Red', 'Yellow', 'Green', 'Blue'],
-            'CFrame': ['identity']
-        };
-
-        return knownStatic[typeName]?.includes(propertyName) || false;
-    }
-
-    /**
-     * Check if a type is constructible (has a constructor)
-     */
-    private isConstructibleType(typeName: string): boolean {
-        const constructibleTypes = [
-            'Color3', 'Vector2', 'Vector3', 'UDim', 'UDim2', 'CFrame', 'Ray',
-            'Region3', 'BrickColor', 'NumberRange', 'ColorSequence',
-            'NumberSequence', 'PathWaypoint', 'TweenInfo', 'Random'
-        ];
-        return constructibleTypes.includes(typeName);
-    }
-
-    /**
-     * Initialize fallback mode with hardcoded Roblox API knowledge
-     * Used when @rbxts/types is not available at transform time
-     */
-    private initializeFallbackMode(): void {
-        // Static constructors
-        const constructibleTypes = [
-            'Color3', 'Vector2', 'Vector3', 'UDim', 'UDim2', 'CFrame', 'Ray',
-            'Region3', 'BrickColor', 'NumberRange', 'ColorSequence',
-            'NumberSequence', 'PathWaypoint', 'TweenInfo', 'Random'
-        ];
-
-        for (const type of constructibleTypes) {
-            this.staticConstructors.add(type);
-        }
-
-        // Static methods
-        const staticMethods: Record<string, string[]> = {
-            'Color3': ['new', 'fromRGB', 'fromHSV', 'fromHex'],
-            'Vector2': ['new'],
-            'Vector3': ['new', 'FromNormalId', 'FromAxis'],
-            'UDim': ['new'],
-            'UDim2': ['new', 'fromScale', 'fromOffset'],
-            'CFrame': ['new', 'lookAt', 'fromAxisAngle', 'fromOrientation', 'fromEulerAnglesXYZ', 'fromEulerAnglesYXZ', 'fromMatrix', 'Angles'],
-            'Ray': ['new'],
-            'Region3': ['new'],
-            'BrickColor': ['new', 'palette', 'random', 'White', 'Gray', 'DarkGray', 'Black', 'Red', 'Yellow', 'Green', 'Blue'],
-            'NumberRange': ['new'],
-            'ColorSequence': ['new'],
-            'NumberSequence': ['new'],
-            'PathWaypoint': ['new'],
-            'TweenInfo': ['new'],
-            'Random': ['new']
-        };
-
-        for (const [typeName, methods] of Object.entries(staticMethods)) {
-            this.staticMethods.set(typeName, new Set(methods));
-        }
-
-        // Static properties
-        const staticProperties: Record<string, string[]> = {
-            'BrickColor': ['White', 'Gray', 'DarkGray', 'Black', 'Red', 'Yellow', 'Green', 'Blue'],
-            'CFrame': ['identity'],
-            'Enum': [] // Will be populated with all enum types
-        };
-
-        for (const [typeName, properties] of Object.entries(staticProperties)) {
-            this.staticProperties.set(typeName, new Set(properties));
-        }
-
-        // Common Enum types (subset for performance)
-        const commonEnums = [
-            'Material', 'SurfaceType', 'FormFactor', 'Shape', 'Axis', 'NormalId',
-            'Font', 'FontSize', 'TextXAlignment', 'TextYAlignment', 'SizeConstraint',
-            'AspectType', 'DominantAxis', 'FillDirection', 'HorizontalAlignment',
-            'SortOrder', 'VerticalAlignment', 'EasingDirection', 'EasingStyle',
-            'KeyCode', 'UserInputType', 'PlaybackState', 'ThumbnailType',
-            'ThumbnailSize', 'DeviceType', 'Platform'
-        ];
-
-        const enumSet = this.staticProperties.get('Enum') || new Set<string>();
-        for (const enumType of commonEnums) {
-            enumSet.add(enumType);
-        }
-        this.staticProperties.set('Enum', enumSet);
     }
 
     /**

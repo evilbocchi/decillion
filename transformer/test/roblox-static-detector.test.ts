@@ -1,20 +1,40 @@
-import { describe, it, expect, beforeEach } from 'vitest';
 import * as ts from 'typescript';
+import { beforeEach, describe, expect, it } from 'vitest';
 
 // Import the class directly to create a new instance for testing
 import { robloxStaticDetector } from '../src/roblox-static-detector';
 
-describe('RobloxStaticDetector', () => {    
+describe('RobloxStaticDetector', () => {
+    let program: ts.Program;
+
     beforeEach(() => {
-        // Initialize with a simple empty program to trigger fallback mode
-        const emptyProgram = ts.createProgram([], {}, ts.createCompilerHost({}));
-        robloxStaticDetector.initialize(emptyProgram);
+        // Create a minimal TypeScript program for testing
+        const sourceFile = ts.createSourceFile(
+            'test.tsx',
+            '',
+            ts.ScriptTarget.Latest,
+            true,
+            ts.ScriptKind.TSX
+        );
+
+        program = ts.createProgram(['test.tsx'], {}, {
+            getSourceFile: () => sourceFile,
+            writeFile: () => { },
+            getCurrentDirectory: () => '',
+            getDirectories: () => [],
+            fileExists: () => true,
+            readFile: () => '',
+            getCanonicalFileName: (fileName) => fileName,
+            useCaseSensitiveFileNames: () => true,
+            getNewLine: () => '\n',
+            getDefaultLibFileName: () => 'lib.d.ts'
+        });
     });
 
     function createCallExpression(code: string): ts.CallExpression | undefined {
         const sourceFile = ts.createSourceFile('test.ts', code, ts.ScriptTarget.Latest);
         let callExpression: ts.CallExpression | undefined;
-        
+
         const visit = (node: ts.Node) => {
             if (ts.isCallExpression(node)) {
                 callExpression = node;
@@ -22,14 +42,14 @@ describe('RobloxStaticDetector', () => {
             ts.forEachChild(node, visit);
         };
         visit(sourceFile);
-        
+
         return callExpression;
     }
 
     function createNewExpression(code: string): ts.NewExpression | undefined {
         const sourceFile = ts.createSourceFile('test.ts', code, ts.ScriptTarget.Latest);
         let newExpression: ts.NewExpression | undefined;
-        
+
         const visit = (node: ts.Node) => {
             if (ts.isNewExpression(node)) {
                 newExpression = node;
@@ -37,7 +57,7 @@ describe('RobloxStaticDetector', () => {
             ts.forEachChild(node, visit);
         };
         visit(sourceFile);
-        
+
         return newExpression;
     }
 
