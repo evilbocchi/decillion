@@ -31,6 +31,8 @@ export class BlockAnalyzer {
         }
 
         const blockId = `block_${this.blockCounter++}`;
+        const tagName = this.getJsxTagName(node);
+        
         const blockInfo: BlockInfo = {
             id: blockId,
             staticProps: [],
@@ -39,6 +41,14 @@ export class BlockAnalyzer {
             isStatic: true,
             dependencies: []
         };
+
+        // React components (PascalCase) should never be treated as static
+        // because they can have internal state, effects, hooks, etc.
+        if (tagName[0] && tagName[0] === tagName[0].toUpperCase()) {
+            blockInfo.isStatic = false;
+            // Add the component itself as a dependency if it's an identifier
+            blockInfo.dependencies.push(tagName);
+        }
 
         // Analyze attributes/props
         const attributes = this.getJsxAttributes(node);

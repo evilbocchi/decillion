@@ -11,6 +11,22 @@ import {
 import type { OptimizationContext, PropInfo, TransformResult } from "./types";
 
 /**
+ * Creates the appropriate tag reference for React.createElement
+ * - Lowercase tags (frame, textlabel) become string literals
+ * - PascalCase tags (Counter, MyComponent) become identifiers
+ */
+function createTagReference(tagName: string): ts.Expression {
+    // Check if tag name starts with uppercase (PascalCase component)
+    if (tagName[0] && tagName[0] === tagName[0].toUpperCase()) {
+        // React component - use identifier
+        return ts.factory.createIdentifier(tagName);
+    } else {
+        // HTML-like element - use string literal
+        return ts.factory.createStringLiteral(tagName);
+    }
+}
+
+/**
  * Core block transformation logic
  * Following Million.js pattern using the existing BlockAnalyzer
  */
@@ -137,7 +153,7 @@ function generateMemoizedBlock(
         ),
         undefined,
         [
-            ts.factory.createStringLiteral(tagName),
+            createTagReference(tagName),
             allProps.length > 0 ? createPropsObject(allProps) : ts.factory.createIdentifier("undefined"),
             ...children
         ]
@@ -173,7 +189,7 @@ function generateOptimizedElement(
         ),
         undefined,
         [
-            ts.factory.createStringLiteral(tagName),
+            createTagReference(tagName),
             propsArg,
             ...children
         ]
