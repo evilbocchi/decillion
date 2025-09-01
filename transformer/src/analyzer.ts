@@ -212,6 +212,7 @@ export class BlockAnalyzer {
             return;
         }
 
+        // Handle call expressions (func())
         if (ts.isCallExpression(expr)) {
             // Use the Roblox static detector for more comprehensive detection
             if (robloxStaticDetector.isStaticRobloxCall(expr)) {

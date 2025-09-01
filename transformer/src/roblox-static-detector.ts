@@ -2,6 +2,13 @@ import * as fs from "fs";
 import * as path from "path";
 import * as ts from "typescript";
 
+interface CacheData {
+    version: string;
+    staticConstructors: string[];
+    staticMethods: Record<string, string[]>;
+    staticProperties: Record<string, string[]>;
+}
+
 /**
  * Cache for Roblox built-in detection to avoid re-parsing roblox.d.ts
  */
@@ -11,6 +18,8 @@ class RobloxStaticDetector {
     private staticProperties = new Map<string, Set<string>>();
     private initialized = false;
     private visitedFiles = new Set<string>();
+    private currentRbxtsVersion?: string;
+    private cacheFilePath?: string;
 
     /**
      * Initialize the detector by parsing roblox.d.ts and all referenced files
@@ -20,6 +29,16 @@ class RobloxStaticDetector {
 
         // Clear visited files cache for fresh initialization
         this.visitedFiles.clear();
+
+        // Get @rbxts/types version for caching
+        this.currentRbxtsVersion = this.getRbxtsVersion(program);
+        this.cacheFilePath = this.getCacheFilePath(program);
+
+        // Try to load from cache first
+        if (this.currentRbxtsVersion && this.loadFromCache()) {
+            this.initialized = true;
+            return;
+        }
 
         const resolved = this.resolveRobloxDTs(program);
         if (!resolved) {
@@ -38,6 +57,9 @@ class RobloxStaticDetector {
         // Parse all referenced files
         this.parseReferencedFiles(robloxDTs);
 
+        // Save to cache
+        this.saveToCache();
+
         this.initialized = true;
     }
 
@@ -48,6 +70,131 @@ class RobloxStaticDetector {
             program.getCompilerOptions(),
             ts.sys
         ).resolvedModule;
+    }
+
+    /**
+     * Get the @rbxts/types version from package.json
+     */
+    private getRbxtsVersion(program: ts.Program): string | undefined {
+        try {
+            const currentDir = program.getCurrentDirectory();
+            const packageJsonPath = this.findPackageJson(currentDir);
+            
+            if (!packageJsonPath || !fs.existsSync(packageJsonPath)) {
+                return undefined;
+            }
+
+            const packageJsonContent = fs.readFileSync(packageJsonPath, 'utf-8');
+            const packageJson = JSON.parse(packageJsonContent);
+            
+            // Check both dependencies and devDependencies
+            const version = packageJson.dependencies?.['@rbxts/types'] || 
+                          packageJson.devDependencies?.['@rbxts/types'];
+            
+            return version;
+        } catch (error) {
+            console.warn('Failed to read @rbxts/types version:', error);
+            return undefined;
+        }
+    }
+
+    /**
+     * Find the nearest package.json file
+     */
+    private findPackageJson(dir: string): string | undefined {
+        let currentDir = dir;
+        
+        while (currentDir !== path.dirname(currentDir)) {
+            const packageJsonPath = path.join(currentDir, 'package.json');
+            if (fs.existsSync(packageJsonPath)) {
+                return packageJsonPath;
+            }
+            currentDir = path.dirname(currentDir);
+        }
+        
+        return undefined;
+    }
+
+    /**
+     * Get the cache file path
+     */
+    private getCacheFilePath(program: ts.Program): string {
+        const currentDir = program.getCurrentDirectory();
+        const cacheDir = path.join(currentDir, 'node_modules', '.cache', 'decillion');
+        
+        // Ensure cache directory exists
+        if (!fs.existsSync(cacheDir)) {
+            fs.mkdirSync(cacheDir, { recursive: true });
+        }
+        
+        return path.join(cacheDir, 'roblox-static-cache.json');
+    }
+
+    /**
+     * Load cached data if version matches
+     */
+    private loadFromCache(): boolean {
+        if (!this.cacheFilePath || !this.currentRbxtsVersion) {
+            return false;
+        }
+
+        try {
+            if (!fs.existsSync(this.cacheFilePath)) {
+                return false;
+            }
+
+            const cacheContent = fs.readFileSync(this.cacheFilePath, 'utf-8');
+            const cacheData: CacheData = JSON.parse(cacheContent);
+
+            // Check if version matches
+            if (cacheData.version !== this.currentRbxtsVersion) {
+                return false;
+            }
+
+            // Load cached data
+            this.staticConstructors = new Set(cacheData.staticConstructors);
+            
+            this.staticMethods.clear();
+            for (const [key, values] of Object.entries(cacheData.staticMethods)) {
+                this.staticMethods.set(key, new Set(values));
+            }
+            
+            this.staticProperties.clear();
+            for (const [key, values] of Object.entries(cacheData.staticProperties)) {
+                this.staticProperties.set(key, new Set(values));
+            }
+
+            return true;
+        } catch (error) {
+            console.warn('Failed to load cache:', error);
+            return false;
+        }
+    }
+
+    /**
+     * Save current data to cache
+     */
+    private saveToCache(): void {
+        if (!this.cacheFilePath || !this.currentRbxtsVersion) {
+            return;
+        }
+
+        try {
+            const cacheData: CacheData = {
+                version: this.currentRbxtsVersion,
+                staticConstructors: Array.from(this.staticConstructors),
+                staticMethods: Object.fromEntries(
+                    Array.from(this.staticMethods.entries()).map(([key, values]) => [key, Array.from(values)])
+                ),
+                staticProperties: Object.fromEntries(
+                    Array.from(this.staticProperties.entries()).map(([key, values]) => [key, Array.from(values)])
+                )
+            };
+
+            fs.writeFileSync(this.cacheFilePath, JSON.stringify(cacheData, null, 2), 'utf-8');
+        } catch (error) {
+            console.warn('Failed to save cache:', error);
+        }
     }
 
     /**

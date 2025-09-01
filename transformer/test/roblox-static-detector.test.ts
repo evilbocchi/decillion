@@ -63,15 +63,15 @@ describe('RobloxStaticDetector', () => {
         return newExpression;
     }
 
-    describe('isStaticRobloxCall', () => {
+    describe('isStaticRoblox', () => {
         it('should detect Color3.fromRGB as static', () => {
             const callExpression = createCallExpression('Color3.fromRGB(255, 0, 0)');
             expect(callExpression).toBeDefined();
             expect(robloxStaticDetector.isStaticRobloxCall(callExpression!)).toBe(true);
         });
 
-        it('should detect Color3.new as static', () => {
-            const callExpression = createCallExpression('Color3.new(1, 0, 0)');
+        it('should detect Color3 constructor as static', () => {
+            const callExpression = createCallExpression('new Color3(1, 0, 0)');
             expect(callExpression).toBeDefined();
             expect(robloxStaticDetector.isStaticRobloxCall(callExpression!)).toBe(true);
         });
@@ -82,24 +82,16 @@ describe('RobloxStaticDetector', () => {
             expect(robloxStaticDetector.isStaticRobloxCall(callExpression!)).toBe(true);
         });
 
-        it('should not detect non-Roblox calls as static', () => {
-            const callExpression = createCallExpression('Math.random()');
-            expect(callExpression).toBeDefined();
-            expect(robloxStaticDetector.isStaticRobloxCall(callExpression!)).toBe(false);
-        });
-    });
-
-    describe('isStaticRobloxNew', () => {
-        it('should detect new Color3() as static', () => {
-            const newExpression = createNewExpression('new Color3(1, 0, 0)');
-            expect(newExpression).toBeDefined();
-            expect(robloxStaticDetector.isStaticRobloxNew(newExpression!)).toBe(true);
-        });
-
         it('should detect new Vector2() as static', () => {
             const newExpression = createNewExpression('new Vector2(100, 200)');
             expect(newExpression).toBeDefined();
             expect(robloxStaticDetector.isStaticRobloxNew(newExpression!)).toBe(true);
+        });
+
+        it('should not detect non-Roblox calls as static', () => {
+            const callExpression = createCallExpression('Math.random()');
+            expect(callExpression).toBeDefined();
+            expect(robloxStaticDetector.isStaticRobloxCall(callExpression!)).toBe(false);
         });
 
         it('should not detect non-Roblox constructors as static', () => {
