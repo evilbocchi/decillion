@@ -52,6 +52,9 @@ export default function (program: ts.Program, options: DecillionTransformerOptio
             );
             const runtimeHelper = new RuntimeHelper(context);
 
+            // Track if we need to add runtime imports
+            let transformationTracker = { needsRuntimeImport: false };
+
             // Helper function to extract static attributes from JSX
             const extractStaticAttributes = (attributeString: string): string => {
                 // Simple attribute extraction - would need more sophisticated parsing for production
@@ -63,6 +66,153 @@ export default function (program: ts.Program, options: DecillionTransformerOptio
                     }
                     return '';
                 }).filter(Boolean).join(', ');
+            };
+
+            // Helper function to transform JSX elements
+            const transformJsxElement = (node: ts.JsxElement | ts.JsxSelfClosingElement): ts.Expression => {
+                if (debug) {
+                    console.log(`Transforming JSX element`);
+                }
+
+                let tagName: string;
+                let attributes: ts.JsxAttributes;
+                let children: ts.JsxChild[] = [];
+
+                if (ts.isJsxElement(node)) {
+                    const elementName = node.openingElement.tagName;
+                    if (!ts.isIdentifier(elementName)) return node;
+                    tagName = elementName.text;
+                    attributes = node.openingElement.attributes;
+                    children = node.children ? Array.from(node.children) : [];
+                } else {
+                    const elementName = node.tagName;
+                    if (!ts.isIdentifier(elementName)) return node;
+                    tagName = elementName.text;
+                    attributes = node.attributes;
+                }
+
+                // Check if this is a static element
+                const isStatic = isStaticJsxElement(attributes, children);
+
+                if (isStatic) {
+                    if (debug) {
+                        console.log(`Creating static JSX element for ${tagName}`);
+                    }
+                    
+                    // Convert JSX attributes to object literal
+                    const propsObject = createPropsObjectFromJsxAttributes(attributes);
+                    
+                    // Use createStaticElement for static content
+                    const staticElementCall = ts.factory.createCallExpression(
+                        ts.factory.createIdentifier("createStaticElement"),
+                        undefined,
+                        [
+                            ts.factory.createStringLiteral(tagName),
+                            propsObject || ts.factory.createNull(),
+                            ...children.map(child => transformJsxChild(child))
+                        ]
+                    );
+                    
+                    // Wrap in JSX expression for proper integration
+                    return ts.factory.createJsxExpression(undefined, staticElementCall);
+                } else {
+                    if (debug) {
+                        console.log(`JSX element ${tagName} is dynamic, keeping as-is for now`);
+                    }
+                    // For now, just return the original element - can add memoization later
+                    return node;
+                }
+            };
+
+            // Helper function to check if JSX element is static
+            const isStaticJsxElement = (attributes: ts.JsxAttributes, children: ts.JsxChild[]): boolean => {
+                // Check if all attributes are static
+                for (const prop of attributes.properties) {
+                    if (ts.isJsxAttribute(prop)) {
+                        if (prop.initializer) {
+                            if (ts.isJsxExpression(prop.initializer)) {
+                                if (prop.initializer.expression && !isStaticExpression(prop.initializer.expression)) {
+                                    return false;
+                                }
+                            }
+                        }
+                    } else {
+                        // JsxSpreadAttribute - dynamic
+                        return false;
+                    }
+                }
+
+                // Check if all children are static
+                for (const child of children) {
+                    if (ts.isJsxExpression(child)) {
+                        if (child.expression && !isStaticExpression(child.expression)) {
+                            return false;
+                        }
+                    } else if (ts.isJsxElement(child) || ts.isJsxSelfClosingElement(child)) {
+                        // Recursively check child elements - for now, assume dynamic
+                        return false;
+                    }
+                    // JsxText and JsxFragment are static
+                }
+
+                return true;
+            };
+
+            // Helper function to convert JSX attributes to object literal
+            const createPropsObjectFromJsxAttributes = (attributes: ts.JsxAttributes): ts.ObjectLiteralExpression | null => {
+                if (attributes.properties.length === 0) {
+                    return null;
+                }
+
+                const properties: ts.ObjectLiteralElementLike[] = [];
+
+                for (const prop of attributes.properties) {
+                    if (ts.isJsxAttribute(prop)) {
+                        let name: string;
+                        if (ts.isIdentifier(prop.name)) {
+                            name = prop.name.text;
+                        } else if (ts.isJsxNamespacedName(prop.name)) {
+                            name = `${prop.name.namespace.text}:${prop.name.name.text}`;
+                        } else {
+                            // This shouldn't happen, but fallback
+                            name = "unknown";
+                        }
+                        let value: ts.Expression;
+
+                        if (prop.initializer) {
+                            if (ts.isStringLiteral(prop.initializer)) {
+                                value = prop.initializer;
+                            } else if (ts.isJsxExpression(prop.initializer) && prop.initializer.expression) {
+                                value = prop.initializer.expression;
+                            } else {
+                                value = ts.factory.createTrue(); // Boolean attribute
+                            }
+                        } else {
+                            value = ts.factory.createTrue(); // Boolean attribute
+                        }
+
+                        properties.push(ts.factory.createPropertyAssignment(
+                            ts.factory.createStringLiteral(name),
+                            value
+                        ));
+                    }
+                    // Skip spread attributes for now
+                }
+
+                return ts.factory.createObjectLiteralExpression(properties);
+            };
+
+            // Helper function to transform JSX children
+            const transformJsxChild = (child: ts.JsxChild): ts.Expression => {
+                if (ts.isJsxText(child)) {
+                    return ts.factory.createStringLiteral(child.text.trim());
+                } else if (ts.isJsxExpression(child) && child.expression) {
+                    return child.expression;
+                } else if (ts.isJsxElement(child) || ts.isJsxSelfClosingElement(child)) {
+                    return transformJsxElement(child);
+                }
+                // For other cases, return a placeholder
+                return ts.factory.createNull();
             };
 
             // Helper function to transform React.createElement calls
@@ -166,52 +316,84 @@ export default function (program: ts.Program, options: DecillionTransformerOptio
                 return false;
             };
 
-            // Main visitor function to transform React.createElement calls (transformed JSX)
+            // Main visitor function to transform JSX elements and React.createElement calls
             const visitNode = (node: ts.Node): ts.Node => {
-                if (debug && ts.isCallExpression(node)) {
+                // Handle JSX elements  
+                if (ts.isJsxElement(node) || ts.isJsxSelfClosingElement(node)) {
+                    const elementName = ts.isJsxElement(node) 
+                        ? node.openingElement.tagName 
+                        : node.tagName;
+                    
+                    if (ts.isIdentifier(elementName)) {
+                        const tagName = elementName.text;
+                        if (tagName === "frame" || tagName === "textlabel" || tagName === "textbutton") {
+                            if (debug) {
+                                console.log(`Found JSX element: ${tagName}`);
+                            }
+                            
+                            // Transform JSX to optimized call
+                            const transformedElement = transformJsxElement(node);
+                            
+                            // Check if transformation created a JSX expression (meaning it was transformed)
+                            if (ts.isJsxExpression(transformedElement)) {
+                                transformationTracker.needsRuntimeImport = true;
+                                if (debug) {
+                                    console.log(`Transformed ${tagName} JSX element to use createStaticElement - setting needsRuntimeImport=true`);
+                                }
+                            } else {
+                                if (debug) {
+                                    console.log(`JSX element ${tagName} was not transformed (not a JSX expression)`);
+                                }
+                            }
+                            return ts.visitEachChild(transformedElement, visitNode, context);
+                        }
+                    }
+                }
+                
+                // Handle React.createElement calls
+                if (ts.isCallExpression(node)) {
                     const expr = node.expression;
                     if (ts.isPropertyAccessExpression(expr) &&
                         ts.isIdentifier(expr.expression) &&
                         expr.expression.text === "React" &&
                         ts.isIdentifier(expr.name) &&
                         expr.name.text === "createElement") {
-                        console.log(`Found React.createElement call`);
+                        
+                        if (debug) {
+                            console.log(`Found React.createElement call`);
+                        }
 
                         if (node.arguments.length > 0 && ts.isStringLiteral(node.arguments[0])) {
                             const elementType = node.arguments[0].text;
-                            console.log(`Element type: ${elementType}`);
+                            
+                            if (debug) {
+                                console.log(`Element type: ${elementType}`);
+                            }
 
                             // Check if this is a Roblox UI element
                             if (elementType === "frame" || elementType === "textlabel" || elementType === "textbutton") {
-                                console.log(`Found Roblox UI element: ${elementType}`);
-                                return transformReactCreateElement(node);
+                                if (debug) {
+                                    console.log(`Found Roblox UI element: ${elementType}`);
+                                }
+                                
+                                const transformedCall = transformReactCreateElement(node);
+                                
+                                // Check if transformation actually changed the node
+                                if (transformedCall !== node) {
+                                    transformationTracker.needsRuntimeImport = true;
+                                    if (debug) {
+                                        console.log(`Transformed ${elementType} element to use createStaticElement`);
+                                    }
+                                }
+                                
+                                return ts.visitEachChild(transformedCall, visitNode, context);
                             }
                         }
                     }
                 }
 
-                // Continue visiting children for nodes that typically have them
-                if (ts.isSourceFile(node) ||
-                    ts.isModuleDeclaration(node) ||
-                    ts.isClassDeclaration(node) ||
-                    ts.isInterfaceDeclaration(node) ||
-                    ts.isBlock(node) ||
-                    ts.isReturnStatement(node) ||
-                    ts.isExpressionStatement(node) ||
-                    ts.isCallExpression(node) ||
-                    ts.isPropertyAccessExpression(node) ||
-                    ts.isParenthesizedExpression(node) ||
-                    ts.isArrowFunction(node) ||
-                    ts.isFunctionExpression(node) ||
-                    ts.isFunctionDeclaration(node) ||
-                    ts.isVariableStatement(node) ||
-                    ts.isVariableDeclarationList(node) ||
-                    ts.isVariableDeclaration(node)) {
-                    return ts.visitEachChild(node, visitNode, context);
-                }
-
-                // For other nodes, return as-is
-                return node;
+                // Continue visiting children
+                return ts.visitEachChild(node, visitNode, context);
             };
 
             try {
@@ -219,15 +401,43 @@ export default function (program: ts.Program, options: DecillionTransformerOptio
                     console.log(`Analyzing file for optimization opportunities...`);
                 }
 
-                // Get the source text for string-based analysis
-                const sourceText = sourceFile.getFullText();
+                // First check if this file contains JSX elements OR React.createElement calls
+                let hasRobloxElements = false;
+                ts.forEachChild(sourceFile, function visit(node: ts.Node) {
+                    // Check for JSX elements
+                    if (ts.isJsxElement(node) || ts.isJsxSelfClosingElement(node)) {
+                        const elementName = ts.isJsxElement(node) 
+                            ? node.openingElement.tagName 
+                            : node.tagName;
+                        
+                        if (ts.isIdentifier(elementName)) {
+                            const tagName = elementName.text;
+                            if (tagName === "frame" || tagName === "textlabel" || tagName === "textbutton") {
+                                hasRobloxElements = true;
+                            }
+                        }
+                    }
+                    
+                    // Check for React.createElement calls
+                    if (ts.isCallExpression(node)) {
+                        const expr = node.expression;
+                        if (ts.isPropertyAccessExpression(expr) &&
+                            ts.isIdentifier(expr.expression) &&
+                            expr.expression.text === "React" &&
+                            ts.isIdentifier(expr.name) &&
+                            expr.name.text === "createElement") {
+                            if (node.arguments.length > 0 && ts.isStringLiteral(node.arguments[0])) {
+                                const elementType = node.arguments[0].text;
+                                if (elementType === "frame" || elementType === "textlabel" || elementType === "textbutton") {
+                                    hasRobloxElements = true;
+                                }
+                            }
+                        }
+                    }
+                    ts.forEachChild(node, visit);
+                });
 
-                // Check if this file contains Roblox UI elements that we can optimize
-                const hasRobloxUI = sourceText.includes('<frame') ||
-                    sourceText.includes('<textlabel') ||
-                    sourceText.includes('<textbutton');
-
-                if (!hasRobloxUI) {
+                if (!hasRobloxElements) {
                     if (debug) {
                         console.log(`No Roblox UI elements found`);
                     }
@@ -235,65 +445,72 @@ export default function (program: ts.Program, options: DecillionTransformerOptio
                 }
 
                 if (debug) {
-                    console.log(`Found Roblox UI elements, applying string-based optimizations`);
+                    console.log(`Found Roblox UI elements, applying AST-based optimizations`);
                 }
 
-                // Apply string-based transformation as a proof of concept
-                let optimizedText = sourceText;
+                // Track if we need to add runtime imports
+                let needsRuntimeImport = false;
 
-                // Add the runtime import at the top of the file (after existing imports)
-                const importRegex = /(import.*from.*["'].*["'];?\s*\n)/g;
-                const imports = optimizedText.match(importRegex) || [];
+                // Transform the AST while preserving existing transformations
+                const transformedSourceFile = ts.visitNode(sourceFile, visitNode) as ts.SourceFile;
 
-                if (imports.length > 0) {
-                    // Find the last import
-                    let lastImportIndex = 0;
-                    let match;
-                    const regex = /(import.*from.*["'].*["'];?\s*\n)/g;
-                    while ((match = regex.exec(optimizedText)) !== null) {
-                        lastImportIndex = match.index + match[0].length;
+                // Check if we made any transformations that require runtime import
+                if (transformationTracker.needsRuntimeImport) {
+                    if (debug) {
+                        console.log(`Adding runtime import because transformations were made (needsRuntimeImport=${transformationTracker.needsRuntimeImport})`);
+                    }
+                    // Add runtime import to the transformed source file
+                    const runtimeImportDeclaration = ts.factory.createImportDeclaration(
+                        undefined,
+                        ts.factory.createImportClause(
+                            false,
+                            undefined,
+                            ts.factory.createNamedImports([
+                                ts.factory.createImportSpecifier(false, undefined, ts.factory.createIdentifier("createStaticElement")),
+                                ts.factory.createImportSpecifier(false, undefined, ts.factory.createIdentifier("useMemoizedBlock"))
+                            ])
+                        ),
+                        ts.factory.createStringLiteral("@rbxts/decillion-runtime")
+                    );
+
+                    // Insert the import after existing imports
+                    const statements = transformedSourceFile.statements;
+                    let insertIndex = 0;
+                    
+                    // Find the last import statement
+                    for (let i = 0; i < statements.length; i++) {
+                        if (ts.isImportDeclaration(statements[i])) {
+                            insertIndex = i + 1;
+                        }
                     }
 
-                    const runtimeImport = `import { createStaticElement, useMemoizedBlock } from "@rbxts/decillion-runtime";\n`;
-                    optimizedText = optimizedText.slice(0, lastImportIndex) +
-                        runtimeImport +
-                        optimizedText.slice(lastImportIndex);
+                    const newStatements = [
+                        ...statements.slice(0, insertIndex),
+                        runtimeImportDeclaration,
+                        ...statements.slice(insertIndex)
+                    ];
+
+                    const finalSourceFile = ts.factory.updateSourceFile(
+                        transformedSourceFile,
+                        newStatements,
+                        transformedSourceFile.isDeclarationFile,
+                        transformedSourceFile.referencedFiles,
+                        transformedSourceFile.typeReferenceDirectives,
+                        transformedSourceFile.hasNoDefaultLib,
+                        transformedSourceFile.libReferenceDirectives
+                    );
 
                     if (debug) {
-                        console.log(`Added runtime import after existing imports`);
+                        console.log(`Added runtime import via AST transformation`);
                     }
+
+                    return runtimeHelper.addTransformerSignature(finalSourceFile, `Optimized by Decillion - static elements converted to createStaticElement calls`);
                 }
-
-                // Simple transformation: replace some static JSX with createStaticElement calls
-                // This is a proof of concept - in reality we'd need proper parsing
-
-                // Transform static textlabel elements
-                const staticTextLabelRegex = /<textlabel\s+([^>]*Text=["']([^"']*)["'][^>]*\/?)>/g;
-                optimizedText = optimizedText.replace(staticTextLabelRegex, (match, attributes, text) => {
-                    if (debug) {
-                        console.log(`Transforming static textlabel: ${text}`);
-                    }
-                    return `{createStaticElement("textlabel", { Text: "${text}", ${extractStaticAttributes(attributes)} })}`;
-                });
-
-                // Add a signature comment to show the file was processed
-                optimizedText = `// Optimized by Decillion - static elements converted to createStaticElement calls\n${optimizedText}`;
 
                 if (debug) {
-                    console.log(`Applied string-based transformation with JSX replacement`);
-                    console.log(`Optimized text preview: ${optimizedText.substring(0, 200)}...`);
+                    console.log(`No runtime import needed, returning transformed source file (needsRuntimeImport=${transformationTracker.needsRuntimeImport})`);
                 }
-
-                // Create a new source file with the modified text
-                const newSourceFile = ts.createSourceFile(
-                    sourceFile.fileName,
-                    optimizedText,
-                    sourceFile.languageVersion,
-                    true,
-                    sourceFile.scriptKind
-                );
-
-                return newSourceFile;
+                return transformedSourceFile;
             } catch (error) {
                 if (debug) {
                     console.warn(`Transformation failed for ${sourceFile.fileName}: ${error}`);

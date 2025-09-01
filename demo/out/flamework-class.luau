@@ -1,6 +1,7 @@
 -- Compiled with roblox-ts v3.0.0
 local TS = _G[script]
--- Optimized by Decillion - static elements converted to createStaticElement calls
+--Optimized by Decillion - static elements converted to createStaticElement calls
+local Reflect = TS.import(script, TS.getModule(script, "@flamework", "core").out).Reflect
 local Service = TS.import(script, TS.getModule(script, "@flamework", "core").out).Service
 local React = TS.import(script, TS.getModule(script, "@rbxts", "react"))
 local ReactRoblox = TS.import(script, TS.getModule(script, "@rbxts", "react-roblox"))
@@ -29,8 +30,14 @@ do
 		print("FlameworkClass initialized!")
 		ReactRoblox.createRoot(Workspace):render(self:createStaticElement())
 	end
-	FlameworkClass = Service()(FlameworkClass) or FlameworkClass
+	do
+		-- (Flamework) FlameworkClass metadata
+		Reflect.defineMetadata(FlameworkClass, "identifier", "@rbxts/decillion-example:flamework-class@FlameworkClass")
+		Reflect.defineMetadata(FlameworkClass, "flamework:implements", { "$:flamework@OnInit" })
+	end
 end
+-- (Flamework) FlameworkClass decorators
+Reflect.decorate(FlameworkClass, "$:flamework@Service", Service, {})
 return {
 	default = FlameworkClass,
 }
