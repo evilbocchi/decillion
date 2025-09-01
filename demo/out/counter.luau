@@ -1,8 +1,6 @@
 -- Compiled with roblox-ts v3.0.0
 local TS = require(game:GetService("ReplicatedStorage"):WaitForChild("rbxts_include"):WaitForChild("RuntimeLib"))
-local _runtime = TS.import(script, game:GetService("ReplicatedStorage"), "rbxts_include", "node_modules", "@decillion", "runtime", "out")
-local createStaticElement = _runtime.createStaticElement
-local useMemoizedBlock = _runtime.useMemoizedBlock
+local useMemoizedBlock = TS.import(script, game:GetService("ReplicatedStorage"), "rbxts_include", "node_modules", "@decillion", "runtime", "out").useMemoizedBlock
 local _react = TS.import(script, game:GetService("ReplicatedStorage"), "rbxts_include", "node_modules", "@rbxts", "react")
 local React = _react
 local useState = _react.useState
@@ -15,11 +13,27 @@ local function Counter()
 	local decrement = function()
 		return setCount(count - 1)
 	end
-	return useMemoizedBlock(function(count, increment, decrement)
-		return block_0_block(count, increment, decrement)
-	end, { count, increment, decrement }, "block_0")
+	return useMemoizedBlock(function(Color3, count, increment, decrement)
+		return block_0_block(Color3, count, increment, decrement)
+	end, { Color3, count, increment, decrement }, "block_0")
 end
-local function block_3_block(count)
+local function block_2_block(Color3)
+	return React.createElement("textlabel", {
+		Text = "Optimized Counter App",
+		TextColor3 = Color3.fromRGB(255, 255, 255),
+		BackgroundTransparency = 1,
+		Size = UDim2.new(1, 0, 1, 0),
+	})
+end
+local function block_1_block(Color3)
+	return React.createElement("frame", {
+		BackgroundColor3 = Color3.fromRGB(50, 50, 50),
+		Size = UDim2.new(1, 0, 0, 50),
+	}, useMemoizedBlock(function(Color3)
+		return block_2_block(Color3)
+	end, { Color3 }, "block_2"))
+end
+local function block_3_block(count, Color3)
 	return React.createElement("textlabel", {
 		Text = `Count: {count}`,
 		TextColor3 = Color3.fromRGB(255, 255, 255),
@@ -28,7 +42,7 @@ local function block_3_block(count)
 		Position = UDim2.new(0, 0, 0, 60),
 	})
 end
-local function block_4_block(increment)
+local function block_4_block(Color3, increment)
 	return React.createElement("textbutton", {
 		Text = "Increment",
 		TextColor3 = Color3.fromRGB(255, 255, 255),
@@ -40,7 +54,7 @@ local function block_4_block(increment)
 		},
 	})
 end
-local function block_5_block(decrement)
+local function block_5_block(Color3, decrement)
 	return React.createElement("textbutton", {
 		Text = "Decrement",
 		TextColor3 = Color3.fromRGB(255, 255, 255),
@@ -52,21 +66,38 @@ local function block_5_block(decrement)
 		},
 	})
 end
-function block_0_block(count, increment, decrement)
+local function block_7_block(Color3)
+	return React.createElement("textlabel", {
+		Text = "Performance: Decillion Optimized",
+		TextColor3 = Color3.fromRGB(200, 200, 200),
+		BackgroundTransparency = 1,
+		Size = UDim2.new(1, 0, 1, 0),
+	})
+end
+local function block_6_block(Color3)
+	return React.createElement("frame", {
+		Size = UDim2.new(1, 0, 0, 100),
+		Position = UDim2.new(0, 0, 0, 160),
+		BackgroundColor3 = Color3.fromRGB(60, 60, 60),
+	}, useMemoizedBlock(function(Color3)
+		return block_7_block(Color3)
+	end, { Color3 }, "block_7"))
+end
+function block_0_block(Color3, count, increment, decrement)
 	return React.createElement("frame", {
 		Size = UDim2.new(1, 0, 1, 0),
 		BackgroundColor3 = Color3.fromRGB(30, 30, 30),
-	}, createStaticElement("frame", nil, createStaticElement("textlabel", {
-		Text = "Optimized Counter App",
-	})), useMemoizedBlock(function(count)
-		return block_3_block(count)
-	end, { count }, "block_3"), useMemoizedBlock(function(increment)
-		return block_4_block(increment)
-	end, { increment }, "block_4"), useMemoizedBlock(function(decrement)
-		return block_5_block(decrement)
-	end, { decrement }, "block_5"), createStaticElement("frame", nil, createStaticElement("textlabel", {
-		Text = "Performance: Decillion Optimized",
-	})))
+	}, useMemoizedBlock(function(Color3)
+		return block_1_block(Color3)
+	end, { Color3 }, "block_1"), useMemoizedBlock(function(count, Color3)
+		return block_3_block(count, Color3)
+	end, { count, Color3 }, "block_3"), useMemoizedBlock(function(Color3, increment)
+		return block_4_block(Color3, increment)
+	end, { Color3, increment }, "block_4"), useMemoizedBlock(function(Color3, decrement)
+		return block_5_block(Color3, decrement)
+	end, { Color3, decrement }, "block_5"), useMemoizedBlock(function(Color3)
+		return block_6_block(Color3)
+	end, { Color3 }, "block_6"))
 end
 return {
 	default = Counter,

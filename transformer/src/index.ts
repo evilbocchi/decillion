@@ -35,8 +35,19 @@ export default function (program: ts.Program, options: DecillionTransformerOptio
                 console.log(`Decillion transformer processing: ${sourceFile.fileName}`);
             }
 
-            // Quick check: if the file doesn't contain JSX, don't transform it
             const sourceText = sourceFile.getFullText();
+
+            // Check for //undecillion comment at the top of the file to skip transformation
+            const lines = sourceText.split('\n');
+            const firstNonEmptyLine = lines.find(line => line.trim().length > 0);
+            if (firstNonEmptyLine && firstNonEmptyLine.trim().startsWith('//undecillion')) {
+                if (debug) {
+                    console.log(`Skipping transformation for ${sourceFile.fileName} due to //undecillion comment`);
+                }
+                return sourceFile;
+            }
+
+            // Quick check: if the file doesn't contain JSX, don't transform it
             if (!sourceText.includes('<') && !sourceText.includes('React.createElement')) {
                 return sourceFile;
             }

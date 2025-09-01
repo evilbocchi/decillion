@@ -1,3 +1,4 @@
+//undecillion
 import React from "@rbxts/react";
 import ReactRoblox from "@rbxts/react-roblox";
 
@@ -11,7 +12,7 @@ export = {
                 BackgroundColor3={new Color3(1, 1, 1)}
                 Position={new UDim2(0.5, 0, 0.5, 0)}
                 Size={new UDim2(0, 200, 0, 200)}
-                Text={"Hello, world!"}
+                Text={"This should not be transformed by Decillion!"}
             />
         );
     },
