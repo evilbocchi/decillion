@@ -1,0 +1,1 @@
+MILLION_REFERENCE is the core implementation of Million.js straight from their codebase! Use this to refer to the underlying mechanics and optimizations that make Million.js work.
