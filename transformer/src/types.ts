@@ -1,5 +1,5 @@
 import * as ts from "typescript";
-import type { BlockAnalyzer } from "./block-analyzer";
+import type { BlockAnalyzer } from "./analyzer";
 
 /**
  * Core types for block analysis and transformation

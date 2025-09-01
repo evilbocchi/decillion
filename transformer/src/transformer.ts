@@ -1,5 +1,5 @@
 import * as ts from "typescript";
-import type { BlockInfo } from "./block-analyzer";
+import type { BlockInfo } from "./analyzer";
 import {
     createMemoizedArrowFunction,
     createMemoizedBlockCall,

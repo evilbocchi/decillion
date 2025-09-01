@@ -1,5 +1,5 @@
 import * as ts from "typescript";
-import { BlockAnalyzer } from "./block-analyzer";
+import { BlockAnalyzer } from "./analyzer";
 import { DecillionTransformer, transformJsxElement } from "./transformer";
 import type { OptimizationContext, PropInfo } from "./types";
 
