@@ -72,12 +72,17 @@ export class BlockTransformer {
         const props = this.extractStaticProps(node);
         const children = this.extractStaticChildren(node);
 
+        // Create props object or use undefined if no props
+        const propsArg = props.length > 0 ? 
+            this.createPropsObject(props) : 
+            ts.factory.createIdentifier("undefined");
+
         return ts.factory.createCallExpression(
             ts.factory.createIdentifier("createStaticElement"),
             undefined,
             [
                 ts.factory.createStringLiteral(tagName),
-                props.length > 0 ? this.createPropsObject(props) : ts.factory.createNull(),
+                propsArg,
                 ...children
             ]
         );
@@ -133,6 +138,11 @@ export class BlockTransformer {
         const props = this.extractAllProps(node);
         const children = this.extractOptimizedChildren(node);
 
+        // Create props object or use undefined if no props
+        const propsArg = props.length > 0 ? 
+            this.createPropsObject(props) : 
+            ts.factory.createIdentifier("undefined");
+
         return ts.factory.createCallExpression(
             ts.factory.createPropertyAccessExpression(
                 ts.factory.createIdentifier("React"),
@@ -141,7 +151,7 @@ export class BlockTransformer {
             undefined,
             [
                 ts.factory.createStringLiteral(tagName),
-                props.length > 0 ? this.createPropsObject(props) : ts.factory.createNull(),
+                propsArg,
                 ...children
             ]
         );
@@ -182,7 +192,7 @@ export class BlockTransformer {
                     undefined,
                     [
                         ts.factory.createStringLiteral(tagName),
-                        props.length > 0 ? this.createPropsObject(props) : ts.factory.createNull(),
+                        props.length > 0 ? this.createPropsObject(props) : ts.factory.createIdentifier("undefined"),
                         ...children
                     ]
                 )

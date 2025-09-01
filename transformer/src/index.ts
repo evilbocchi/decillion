@@ -37,7 +37,7 @@ export default function (program: ts.Program, options: DecillionTransformerOptio
 
             // Quick check: if the file doesn't contain JSX, don't transform it
             const sourceText = sourceFile.getFullText();
-            if (!sourceText.includes('<')) {
+            if (!sourceText.includes('<') && !sourceText.includes('React.createElement')) {
                 return sourceFile;
             }
 
@@ -52,17 +52,57 @@ export default function (program: ts.Program, options: DecillionTransformerOptio
             );
             const runtimeHelper = new RuntimeHelper(context);
 
-            // Helper function to extract static attributes from JSX
-            const extractStaticAttributes = (attributeString: string): string => {
-                // Simple attribute extraction - would need more sophisticated parsing for production
-                const attrs = attributeString.match(/(\w+)=\{([^}]+)\}/g) || [];
-                return attrs.map(attr => {
-                    const [, name, value] = attr.match(/(\w+)=\{([^}]+)\}/) || [];
-                    if (name && value && name !== 'Text') {
-                        return `${name}: ${value}`;
+            let needsRuntimeImport = false;
+
+            // Main visitor function to transform JSX and React.createElement calls
+            const visitNode = (node: ts.Node): ts.Node => {
+                // Transform JSX elements directly
+                if (ts.isJsxElement(node) || ts.isJsxSelfClosingElement(node)) {
+                    if (debug) {
+                        const tagName = analyzer.getJsxTagName(node);
+                        console.log(`Found JSX element: ${tagName}`);
                     }
-                    return '';
-                }).filter(Boolean).join(', ');
+                    
+                    needsRuntimeImport = true;
+                    return blockTransformer.transformJsxElement(node) as ts.Node;
+                }
+
+                // Transform React.createElement calls
+                if (ts.isCallExpression(node)) {
+                    const expr = node.expression;
+                    if (ts.isPropertyAccessExpression(expr) &&
+                        ts.isIdentifier(expr.expression) &&
+                        expr.expression.text === "React" &&
+                        ts.isIdentifier(expr.name) &&
+                        expr.name.text === "createElement") {
+                        
+                        if (node.arguments.length > 0 && ts.isStringLiteral(node.arguments[0])) {
+                            const elementType = node.arguments[0].text;
+                            
+                            if (debug) {
+                                console.log(`Found React.createElement call for: ${elementType}`);
+                            }
+
+                            // Check if this is a Roblox UI element
+                            const robloxUIElements = ['frame', 'textlabel', 'textbutton', 'scrollingframe', 'imagelabel', 'imagebutton'];
+                            if (robloxUIElements.includes(elementType.toLowerCase())) {
+                                needsRuntimeImport = true;
+                                return transformReactCreateElement(node);
+                            }
+                        }
+                    }
+                }
+
+                // Transform function components
+                if (ts.isFunctionDeclaration(node) || ts.isArrowFunction(node) || ts.isFunctionExpression(node)) {
+                    const transformedComponent = blockTransformer.transformComponent(node);
+                    if (transformedComponent) {
+                        return transformedComponent;
+                    }
+                }
+
+                // Continue visiting children
+                return ts.visitEachChild(node, visitNode, context);
             };
 
             // Helper function to transform React.createElement calls
@@ -88,16 +128,20 @@ export default function (program: ts.Program, options: DecillionTransformerOptio
                         console.log(`Creating static element for ${elementType}`);
                     }
                     // Use createStaticElement for static content
+                    // Convert null/undefined props to undefined for better type compatibility
+                    const propsArg = props.kind === ts.SyntaxKind.NullKeyword ? 
+                        ts.factory.createIdentifier("undefined") : props;
+                    
                     return ts.factory.createCallExpression(
                         ts.factory.createIdentifier("createStaticElement"),
                         undefined,
-                        [node.arguments[0], props, ...children]
+                        [node.arguments[0], propsArg, ...children]
                     );
                 } else {
                     if (debug) {
                         console.log(`Creating optimized element for ${elementType}`);
                     }
-                    // For now, just return the original call - can add memoization later
+                    // Return optimized createElement call
                     return node;
                 }
             };
@@ -166,134 +210,35 @@ export default function (program: ts.Program, options: DecillionTransformerOptio
                 return false;
             };
 
-            // Main visitor function to transform React.createElement calls (transformed JSX)
-            const visitNode = (node: ts.Node): ts.Node => {
-                if (debug && ts.isCallExpression(node)) {
-                    const expr = node.expression;
-                    if (ts.isPropertyAccessExpression(expr) &&
-                        ts.isIdentifier(expr.expression) &&
-                        expr.expression.text === "React" &&
-                        ts.isIdentifier(expr.name) &&
-                        expr.name.text === "createElement") {
-                        console.log(`Found React.createElement call`);
-
-                        if (node.arguments.length > 0 && ts.isStringLiteral(node.arguments[0])) {
-                            const elementType = node.arguments[0].text;
-                            console.log(`Element type: ${elementType}`);
-
-                            // Check if this is a Roblox UI element
-                            if (elementType === "frame" || elementType === "textlabel" || elementType === "textbutton") {
-                                console.log(`Found Roblox UI element: ${elementType}`);
-                                return transformReactCreateElement(node);
-                            }
-                        }
-                    }
-                }
-
-                // Continue visiting children for nodes that typically have them
-                if (ts.isSourceFile(node) ||
-                    ts.isModuleDeclaration(node) ||
-                    ts.isClassDeclaration(node) ||
-                    ts.isInterfaceDeclaration(node) ||
-                    ts.isBlock(node) ||
-                    ts.isReturnStatement(node) ||
-                    ts.isExpressionStatement(node) ||
-                    ts.isCallExpression(node) ||
-                    ts.isPropertyAccessExpression(node) ||
-                    ts.isParenthesizedExpression(node) ||
-                    ts.isArrowFunction(node) ||
-                    ts.isFunctionExpression(node) ||
-                    ts.isFunctionDeclaration(node) ||
-                    ts.isVariableStatement(node) ||
-                    ts.isVariableDeclarationList(node) ||
-                    ts.isVariableDeclaration(node)) {
-                    return ts.visitEachChild(node, visitNode, context);
-                }
-
-                // For other nodes, return as-is
-                return node;
-            };
-
             try {
                 if (debug) {
-                    console.log(`Analyzing file for optimization opportunities...`);
+                    console.log(`Starting AST-based transformation...`);
                 }
 
-                // Get the source text for string-based analysis
-                const sourceText = sourceFile.getFullText();
+                // Apply AST-based transformation
+                let transformedFile = ts.visitNode(sourceFile, visitNode) as ts.SourceFile;
 
-                // Check if this file contains Roblox UI elements that we can optimize
-                const hasRobloxUI = sourceText.includes('<frame') ||
-                    sourceText.includes('<textlabel') ||
-                    sourceText.includes('<textbutton');
+                // Add runtime import if needed
+                if (needsRuntimeImport) {
+                    transformedFile = addRuntimeImport(transformedFile);
+                }
 
-                if (!hasRobloxUI) {
-                    if (debug) {
-                        console.log(`No Roblox UI elements found`);
-                    }
-                    return sourceFile;
+                // Add generated block functions if any were created
+                if (blockTransformer.hasGeneratedBlocks()) {
+                    transformedFile = addBlockFunctions(transformedFile, blockTransformer.getBlockFunctions());
+                }
+
+                // Add signature comment if requested
+                if (addSignature) {
+                    const signature = signatureMessage || "Optimized by Decillion - Million.js-style block memoization for Roblox-TS";
+                    transformedFile = addSignatureComment(transformedFile, signature);
                 }
 
                 if (debug) {
-                    console.log(`Found Roblox UI elements, applying string-based optimizations`);
+                    console.log(`AST-based transformation completed successfully`);
                 }
 
-                // Apply string-based transformation as a proof of concept
-                let optimizedText = sourceText;
-
-                // Add the runtime import at the top of the file (after existing imports)
-                const importRegex = /(import.*from.*["'].*["'];?\s*\n)/g;
-                const imports = optimizedText.match(importRegex) || [];
-
-                if (imports.length > 0) {
-                    // Find the last import
-                    let lastImportIndex = 0;
-                    let match;
-                    const regex = /(import.*from.*["'].*["'];?\s*\n)/g;
-                    while ((match = regex.exec(optimizedText)) !== null) {
-                        lastImportIndex = match.index + match[0].length;
-                    }
-
-                    const runtimeImport = `import { createStaticElement, useMemoizedBlock } from "@rbxts/decillion-runtime";\n`;
-                    optimizedText = optimizedText.slice(0, lastImportIndex) +
-                        runtimeImport +
-                        optimizedText.slice(lastImportIndex);
-
-                    if (debug) {
-                        console.log(`Added runtime import after existing imports`);
-                    }
-                }
-
-                // Simple transformation: replace some static JSX with createStaticElement calls
-                // This is a proof of concept - in reality we'd need proper parsing
-
-                // Transform static textlabel elements
-                const staticTextLabelRegex = /<textlabel\s+([^>]*Text=["']([^"']*)["'][^>]*\/?)>/g;
-                optimizedText = optimizedText.replace(staticTextLabelRegex, (match, attributes, text) => {
-                    if (debug) {
-                        console.log(`Transforming static textlabel: ${text}`);
-                    }
-                    return `{createStaticElement("textlabel", { Text: "${text}", ${extractStaticAttributes(attributes)} })}`;
-                });
-
-                // Add a signature comment to show the file was processed
-                optimizedText = `// Optimized by Decillion - static elements converted to createStaticElement calls\n${optimizedText}`;
-
-                if (debug) {
-                    console.log(`Applied string-based transformation with JSX replacement`);
-                    console.log(`Optimized text preview: ${optimizedText.substring(0, 200)}...`);
-                }
-
-                // Create a new source file with the modified text
-                const newSourceFile = ts.createSourceFile(
-                    sourceFile.fileName,
-                    optimizedText,
-                    sourceFile.languageVersion,
-                    true,
-                    sourceFile.scriptKind
-                );
-
-                return newSourceFile;
+                return transformedFile;
             } catch (error) {
                 if (debug) {
                     console.warn(`Transformation failed for ${sourceFile.fileName}: ${error}`);
@@ -303,6 +248,70 @@ export default function (program: ts.Program, options: DecillionTransformerOptio
                 }
                 // Return original file if transformation completely fails
                 return sourceFile;
+            }
+
+            // Helper function to add runtime import
+            function addRuntimeImport(file: ts.SourceFile): ts.SourceFile {
+                const runtimeImportDeclaration = ts.factory.createImportDeclaration(
+                    undefined,
+                    ts.factory.createImportClause(
+                        false,
+                        undefined,
+                        ts.factory.createNamedImports([
+                            ts.factory.createImportSpecifier(
+                                false,
+                                undefined,
+                                ts.factory.createIdentifier("createStaticElement")
+                            ),
+                            ts.factory.createImportSpecifier(
+                                false,
+                                undefined,
+                                ts.factory.createIdentifier("useMemoizedBlock")
+                            )
+                        ])
+                    ),
+                    ts.factory.createStringLiteral("@rbxts/decillion-runtime")
+                );
+
+                const statements = [runtimeImportDeclaration, ...file.statements];
+                
+                return ts.factory.updateSourceFile(
+                    file,
+                    statements,
+                    file.isDeclarationFile,
+                    file.referencedFiles,
+                    file.typeReferenceDirectives,
+                    file.hasNoDefaultLib,
+                    file.libReferenceDirectives
+                );
+            }
+
+            // Helper function to add generated block functions
+            function addBlockFunctions(file: ts.SourceFile, blockFunctions: Map<string, ts.FunctionDeclaration>): ts.SourceFile {
+                const blockFunctionStatements = Array.from(blockFunctions.values());
+                const statements = [...file.statements, ...blockFunctionStatements];
+                
+                return ts.factory.updateSourceFile(
+                    file,
+                    statements,
+                    file.isDeclarationFile,
+                    file.referencedFiles,
+                    file.typeReferenceDirectives,
+                    file.hasNoDefaultLib,
+                    file.libReferenceDirectives
+                );
+            }
+
+            // Helper function to add signature comment
+            function addSignatureComment(file: ts.SourceFile, signature: string): ts.SourceFile {
+                const commentNode = ts.addSyntheticLeadingComment(
+                    file,
+                    ts.SyntaxKind.SingleLineCommentTrivia,
+                    ` ${signature}`,
+                    true
+                );
+                
+                return commentNode;
             }
         };
     };
