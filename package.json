@@ -10,9 +10,22 @@
         "copy-runtime": "node copy-runtime.js",
         "dev": "concurrently --prefix none \"cd demo && npm run dev\" \"cd runtime && npm run dev\" \"cd transformer && npm run dev\"",
         "test": "vitest",
+        "test:run": "vitest run",
+        "test:watch": "vitest watch",
+        "test:coverage": "vitest run --coverage",
         "lint": "eslint src --ext .ts,.tsx",
         "lint:fix": "eslint src --ext .ts,.tsx --fix",
         "prepublishOnly": "npm run build"
+    },
+    "devDependencies": {
+        "@types/node": "^20.0.0",
+        "@typescript-eslint/eslint-plugin": "^8.0.0",
+        "@typescript-eslint/parser": "^8.0.0",
+        "concurrently": "^8.0.0",
+        "eslint": "^9.0.0",
+        "typescript": "^5.5.3",
+        "vitest": "^2.0.0",
+        "@vitest/coverage-v8": "^2.0.0"
     },
     "keywords": [
         "roblox",
