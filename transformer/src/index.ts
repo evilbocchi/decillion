@@ -259,7 +259,49 @@ export default function (program: ts.Program, options: DecillionTransformerOptio
                 } else if (ts.isJsxExpression(child) && child.expression) {
                     return child.expression;
                 } else if (ts.isJsxElement(child) || ts.isJsxSelfClosingElement(child)) {
-                    return transformJsxElement(child);
+                    // Recursively transform child JSX elements to createStaticElement calls
+                    // Don't return JSX expressions, return direct function calls
+                    const elementName = ts.isJsxElement(child) 
+                        ? child.openingElement.tagName 
+                        : child.tagName;
+                    
+                    if (ts.isIdentifier(elementName)) {
+                        const tagName = elementName.text;
+                        
+                        let attributes: ts.JsxAttributes;
+                        let grandchildren: ts.JsxChild[] = [];
+
+                        if (ts.isJsxElement(child)) {
+                            attributes = child.openingElement.attributes;
+                            grandchildren = child.children ? Array.from(child.children) : [];
+                        } else {
+                            attributes = child.attributes;
+                        }
+
+                        const isStatic = isStaticJsxElement(attributes, grandchildren);
+                        
+                        if (isStatic) {
+                            // Convert to createStaticElement call directly
+                            const propsObject = createPropsObjectFromJsxAttributes(attributes);
+                            const transformedGrandchildren = grandchildren
+                                .map(grandchild => transformJsxChild(grandchild))
+                                .filter((grandchild): grandchild is ts.Expression => grandchild !== null);
+                            
+                            return ts.factory.createCallExpression(
+                                ts.factory.createIdentifier("createStaticElement"),
+                                undefined,
+                                [
+                                    ts.factory.createStringLiteral(tagName),
+                                    propsObject || ts.factory.createIdentifier("undefined"),
+                                    ...transformedGrandchildren
+                                ]
+                            );
+                        }
+                    }
+                    
+                    // If not static, we shouldn't get here in static contexts
+                    // Return a placeholder that will cause an error rather than invalid JSX
+                    return ts.factory.createNull();
                 }
                 // For other cases, return null (will be filtered out)
                 return null;
@@ -291,7 +333,11 @@ export default function (program: ts.Program, options: DecillionTransformerOptio
                     return ts.factory.createCallExpression(
                         ts.factory.createIdentifier("createStaticElement"),
                         undefined,
-                        [node.arguments[0], props && props.kind !== ts.SyntaxKind.NullKeyword ? props : ts.factory.createIdentifier("undefined"), ...children]
+                        [
+                            node.arguments[0], // element type (already a string literal)
+                            props && props.kind !== ts.SyntaxKind.NullKeyword ? props : ts.factory.createIdentifier("undefined"), 
+                            ...children
+                        ]
                     );
                 } else {
                     if (debug) {
@@ -382,7 +428,7 @@ export default function (program: ts.Program, options: DecillionTransformerOptio
 
             // Main visitor function to transform JSX elements and React.createElement calls
             const visitNode = (node: ts.Node): ts.Node => {
-                // Handle JSX elements  
+                // Handle JSX elements
                 if (ts.isJsxElement(node) || ts.isJsxSelfClosingElement(node)) {
                     const elementName = ts.isJsxElement(node) 
                         ? node.openingElement.tagName 
@@ -395,25 +441,60 @@ export default function (program: ts.Program, options: DecillionTransformerOptio
                                 console.log(`Found JSX element: ${tagName}`);
                             }
                             
-                            // Transform JSX to optimized call
-                            const transformedElement = transformJsxElement(node);
+                            // Check if this element is static
+                            let attributes: ts.JsxAttributes;
+                            let children: ts.JsxChild[] = [];
+
+                            if (ts.isJsxElement(node)) {
+                                attributes = node.openingElement.attributes;
+                                children = node.children ? Array.from(node.children) : [];
+                            } else {
+                                attributes = node.attributes;
+                            }
+
+                            const isStatic = isStaticJsxElement(attributes, children);
                             
-                            // Check if transformation created a JSX expression with createStaticElement call
-                            if (ts.isJsxExpression(transformedElement) && 
-                                transformedElement.expression &&
-                                ts.isCallExpression(transformedElement.expression) &&
-                                ts.isIdentifier(transformedElement.expression.expression) &&
-                                transformedElement.expression.expression.text === "createStaticElement") {
+                            if (isStatic) {
+                                if (debug) {
+                                    console.log(`JSX element ${tagName} is static, transforming to createStaticElement`);
+                                }
+                                
+                                // Convert JSX attributes to object literal
+                                const propsObject = createPropsObjectFromJsxAttributes(attributes);
+                                
+                                // Convert children, filtering out empty/null ones
+                                const transformedChildren = children
+                                    .map(child => transformJsxChild(child))
+                                    .filter((child): child is ts.Expression => child !== null);
+                                
+                                // Create a direct createStaticElement call
+                                const createStaticElementCall = ts.factory.createCallExpression(
+                                    ts.factory.createIdentifier("createStaticElement"),
+                                    undefined,
+                                    [
+                                        ts.factory.createStringLiteral(tagName),
+                                        propsObject || ts.factory.createIdentifier("undefined"),
+                                        ...transformedChildren
+                                    ]
+                                );
+                                
+                                // Create a JSX expression containing the createStaticElement call
+                                const jsxExpression = ts.factory.createJsxExpression(
+                                    undefined,
+                                    createStaticElementCall
+                                );
+                                
                                 transformationTracker.needsRuntimeImport = true;
                                 if (debug) {
-                                    console.log(`Transformed ${tagName} JSX element to use createStaticElement - setting needsRuntimeImport=true`);
+                                    console.log(`Transformed ${tagName} JSX element to JSX expression with createStaticElement call`);
                                 }
+                                
+                                return ts.visitEachChild(jsxExpression, visitNode, context);
                             } else {
                                 if (debug) {
-                                    console.log(`JSX element ${tagName} was not transformed (not a createStaticElement JSX expression)`);
+                                    console.log(`JSX element ${tagName} is dynamic, keeping as JSX`);
                                 }
                             }
-                            return ts.visitEachChild(transformedElement, visitNode, context);
                         }
                     }
                 }
@@ -444,17 +525,33 @@ export default function (program: ts.Program, options: DecillionTransformerOptio
                                     console.log(`Found Roblox UI element: ${elementType}`);
                                 }
                                 
-                                const transformedCall = transformReactCreateElement(node);
+                                const props = node.arguments[1] || ts.factory.createNull();
+                                const children = node.arguments.slice(2);
+
+                                // Use the same static detection logic as JSX
+                                const isStatic = isStaticCreateElementCall(props, children);
                                 
-                                // Check if transformation actually changed the node
-                                if (transformedCall !== node) {
-                                    transformationTracker.needsRuntimeImport = true;
+                                if (isStatic) {
                                     if (debug) {
-                                        console.log(`Transformed ${elementType} element to use createStaticElement`);
+                                        console.log(`React.createElement call for ${elementType} is static, transforming to createStaticElement`);
+                                    }
+                                    
+                                    const transformedCall = transformReactCreateElement(node);
+                                    
+                                    // Check if transformation actually changed the node
+                                    if (transformedCall !== node) {
+                                        transformationTracker.needsRuntimeImport = true;
+                                        if (debug) {
+                                            console.log(`Transformed ${elementType} React.createElement to use createStaticElement`);
+                                        }
+                                    }
+                                    
+                                    return ts.visitEachChild(transformedCall, visitNode, context);
+                                } else {
+                                    if (debug) {
+                                        console.log(`React.createElement call for ${elementType} is dynamic, keeping as-is`);
                                     }
                                 }
-                                
-                                return ts.visitEachChild(transformedCall, visitNode, context);
                             }
                         }
                     }
@@ -486,7 +583,7 @@ export default function (program: ts.Program, options: DecillionTransformerOptio
                         }
                     }
                     
-                    // Check for React.createElement calls
+                    // Check for React.createElement calls (this is what JSX compiles to)
                     if (ts.isCallExpression(node)) {
                         const expr = node.expression;
                         if (ts.isPropertyAccessExpression(expr) &&
