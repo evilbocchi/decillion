@@ -71,9 +71,9 @@ describe('RobloxStaticDetector', () => {
         });
 
         it('should detect Color3 constructor as static', () => {
-            const callExpression = createCallExpression('new Color3(1, 0, 0)');
-            expect(callExpression).toBeDefined();
-            expect(robloxStaticDetector.isStaticRobloxCall(callExpression!)).toBe(true);
+            const newExpression = createNewExpression('new Color3(1, 0, 0)');
+            expect(newExpression).toBeDefined();
+            expect(robloxStaticDetector.isStaticRobloxNew(newExpression!)).toBe(true);
         });
 
         it('should detect UDim2.fromScale as static', () => {
