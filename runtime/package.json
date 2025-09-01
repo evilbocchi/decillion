@@ -44,6 +44,6 @@
         "typescript": "^5.5.3"
     },
     "peerDependencies": {
-        "@rbxts/react": "^17.2.3"
+        "@rbxts/react": ">=17.2.3"
     }
 }

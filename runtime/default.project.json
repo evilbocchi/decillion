@@ -1,6 +1,6 @@
 {
     "tree": {
-      "$path": "out"
+        "$path": "out"
     },
-    "name": "decillion-runtime"
-  }
+    "name": "runtime"
+}
