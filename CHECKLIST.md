@@ -70,8 +70,6 @@
 - [ ] **Multiple Target Support** - Client/server/shared environments
 
 ### **11. Framework Integration**
-- [ ] **Roact Compatibility Layer** - Work with existing Roact components
-- [ ] **Rodux Integration** - State management integration
 - [ ] **Component Library Support** - Work with UI component libraries
 
 ### **12. Advanced Developer Tools**

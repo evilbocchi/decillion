@@ -1,10 +1,10 @@
 -- Compiled with roblox-ts v3.0.0
-local TS = _G[script]
-local createStaticElement = TS.import(script, TS.getModule(script, "@rbxts", "decillion-runtime").out).createStaticElement
-local Reflect = TS.import(script, TS.getModule(script, "@flamework", "core").out).Reflect
-local Service = TS.import(script, TS.getModule(script, "@flamework", "core").out).Service
-local ReactRoblox = TS.import(script, TS.getModule(script, "@rbxts", "react-roblox"))
-local Workspace = TS.import(script, TS.getModule(script, "@rbxts", "services")).Workspace
+local TS = require(game:GetService("ReplicatedStorage"):WaitForChild("rbxts_include"):WaitForChild("RuntimeLib"))
+local createStaticElement = TS.import(script, game:GetService("ReplicatedStorage"), "rbxts_include", "node_modules", "@decillion", "decillion-runtime").createStaticElement
+local Reflect = TS.import(script, game:GetService("ReplicatedStorage"), "rbxts_include", "node_modules", "@flamework", "core", "out").Reflect
+local Service = TS.import(script, game:GetService("ReplicatedStorage"), "rbxts_include", "node_modules", "@flamework", "core", "out").Service
+local ReactRoblox = TS.import(script, game:GetService("ReplicatedStorage"), "rbxts_include", "node_modules", "@rbxts", "react-roblox")
+local Workspace = TS.import(script, game:GetService("ReplicatedStorage"), "rbxts_include", "node_modules", "@rbxts", "services").Workspace
 local FlameworkClass
 do
 	FlameworkClass = setmetatable({}, {
@@ -30,7 +30,7 @@ do
 	end
 	do
 		-- (Flamework) FlameworkClass metadata
-		Reflect.defineMetadata(FlameworkClass, "identifier", "@rbxts/decillion-example:flamework-class@FlameworkClass")
+		Reflect.defineMetadata(FlameworkClass, "identifier", "flamework-class@FlameworkClass")
 		Reflect.defineMetadata(FlameworkClass, "flamework:implements", { "$:flamework@OnInit" })
 	end
 end

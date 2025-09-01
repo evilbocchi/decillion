@@ -1,4 +1,5 @@
 **/node_modules
 **/*.tsbuildinfo
+demo/include
 out
 !demo/out

@@ -1,11 +1,11 @@
 -- Compiled with roblox-ts v3.0.0
-local TS = _G[script]
-local useMemoizedBlock = TS.import(script, TS.getModule(script, "@rbxts", "decillion-runtime").out).useMemoizedBlock
-local _react = TS.import(script, TS.getModule(script, "@rbxts", "decillion-runtime").node_modules["@rbxts"].react.src)
+local TS = require(game:GetService("ReplicatedStorage"):WaitForChild("rbxts_include"):WaitForChild("RuntimeLib"))
+local useMemoizedBlock = TS.import(script, game:GetService("ReplicatedStorage"), "rbxts_include", "node_modules", "@decillion", "decillion-runtime").useMemoizedBlock
+local _react = TS.import(script, game:GetService("ReplicatedStorage"), "rbxts_include", "node_modules", "@decillion", "runtime", "node_modules", "@rbxts", "react", "src")
 local React = _react
 local useState = _react.useState
 local block_0_block
-local function App()
+local function Counter()
 	local count, setCount = useState(0)
 	local increment = function()
 		return setCount(count + 1)
@@ -100,5 +100,5 @@ function block_0_block(Color3, count, increment, decrement)
 	end, { Color3 }, "block_6"))
 end
 return {
-	default = App,
+	default = Counter,
 }

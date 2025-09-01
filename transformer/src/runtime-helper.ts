@@ -72,7 +72,7 @@ export class RuntimeHelper {
                     )
                 ])
             ),
-            ts.factory.createStringLiteral("@rbxts/decillion-runtime"),
+            ts.factory.createStringLiteral("@decillion/runtime"),
             undefined
         );
         

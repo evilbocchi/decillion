@@ -474,7 +474,7 @@ export default function (program: ts.Program, options: DecillionTransformerOptio
                             )
                         ])
                     ),
-                    ts.factory.createStringLiteral("@rbxts/decillion-runtime")
+                    ts.factory.createStringLiteral("@decillion/runtime")
                 );
 
                 const statements = [runtimeImportDeclaration, ...file.statements];

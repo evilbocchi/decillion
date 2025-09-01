@@ -1,5 +1,5 @@
 {
-    "name": "@rbxts/decillion-runtime",
+    "name": "@decillion/runtime",
     "version": "0.0.0",
     "description": "A Million.js-inspired high-performance UI renderer for Roblox-TS",
     "main": "out/init.luau",
