@@ -8,7 +8,7 @@
 	"identifierPrefix": "@rbxts/decillion-example",
 	"classes": [
 		{
-			"filePath": "out\\flamework-class.lua",
+			"filePath": "out/flamework-class.lua",
 			"internalId": "@rbxts/decillion-example:flamework-class@FlameworkClass",
 			"decorators": [
 				{
