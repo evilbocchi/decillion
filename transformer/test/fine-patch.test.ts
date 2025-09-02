@@ -9,13 +9,18 @@ describe("Fine-grained patching", () => {
         sourceFile: ts.SourceFile;
         typeChecker: ts.TypeChecker;
     } {
-        const sourceFile = ts.createSourceFile("test.tsx", "", ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+        const sourceFile = ts.createSourceFile("test.tsx", code, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
 
         const program = ts.createProgram(
             ["test.tsx"],
-            {},
             {
-                getSourceFile: () => sourceFile,
+                target: ts.ScriptTarget.ES2020,
+                module: ts.ModuleKind.CommonJS,
+                jsx: ts.JsxEmit.React,
+                lib: ["lib.es2020.d.ts"],
+            },
+            {
+                getSourceFile: (fileName) => fileName === "test.tsx" ? sourceFile : undefined,
                 writeFile: () => {},
                 getCurrentDirectory: () => "",
                 getDirectories: () => [],
@@ -24,7 +29,26 @@ describe("Fine-grained patching", () => {
                 getCanonicalFileName: (fileName) => fileName,
                 useCaseSensitiveFileNames: () => true,
                 getNewLine: () => "\n",
-                getDefaultLibFileName: () => "lib.d.ts",
+                getDefaultLibFileName: (options) => {
+                    switch (options.target) {
+                        case ts.ScriptTarget.ES5:
+                            return "lib.d.ts";
+                        case ts.ScriptTarget.ES2015:
+                            return "lib.es6.d.ts";
+                        case ts.ScriptTarget.ES2017:
+                            return "lib.es2017.d.ts";
+                        case ts.ScriptTarget.ES2018:
+                            return "lib.es2018.d.ts";
+                        case ts.ScriptTarget.ES2019:
+                            return "lib.es2019.d.ts";
+                        case ts.ScriptTarget.ES2020:
+                        case ts.ScriptTarget.ES2021:
+                        case ts.ScriptTarget.ES2022:
+                        case ts.ScriptTarget.ESNext:
+                        default:
+                            return "lib.es2020.d.ts";
+                    }
+                },
             },
         );
 
@@ -34,11 +58,12 @@ describe("Fine-grained patching", () => {
     function findJsxElement(sourceFile: ts.SourceFile): ts.JsxElement | ts.JsxSelfClosingElement | null {
         let found: ts.JsxElement | ts.JsxSelfClosingElement | null = null;
 
-        function visit(node: ts.Node) {
+        function visit(node: ts.Node): void {
             if ((ts.isJsxElement(node) || ts.isJsxSelfClosingElement(node)) && !found) {
                 found = node;
                 return;
             }
+            // Continue traversing all children even if we haven't found JSX yet
             ts.forEachChild(node, visit);
         }
 

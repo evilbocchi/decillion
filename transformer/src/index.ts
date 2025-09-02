@@ -1,5 +1,6 @@
 import * as ts from "typescript";
 import { BlockAnalyzer } from "./analyzer";
+import { runtimeHelper } from "./runtime-helper";
 import {
     DecillionTransformer,
     getFunctionName,
@@ -225,7 +226,7 @@ function applyPostTransformations(
 
     // Add runtime import if needed
     if (needsRuntimeImport) {
-        transformedFile = addRuntimeImport(transformedFile);
+        transformedFile = runtimeHelper.addRuntimeImports(transformedFile);
     }
 
     // Add static props tables and static elements if any were created
@@ -235,42 +236,11 @@ function applyPostTransformations(
 
     // Add signature comment if requested
     if (addSignature) {
-        const signature =
-            signatureMessage || "Optimized by Decillion - Million.js-style block memoization for Roblox-TS";
-        transformedFile = addSignatureComment(transformedFile, signature);
+        const signature = signatureMessage || "Optimized by Decillion - Million.js in roblox-ts";
+        transformedFile = runtimeHelper.addTransformerSignature(transformedFile, signature);
     }
 
     return transformedFile;
-}
-
-/**
- * Adds runtime import to the file
- */
-function addRuntimeImport(file: ts.SourceFile): ts.SourceFile {
-    const runtimeImportDeclaration = ts.factory.createImportDeclaration(
-        undefined,
-        ts.factory.createImportClause(
-            false,
-            undefined,
-            ts.factory.createNamedImports([
-                ts.factory.createImportSpecifier(false, undefined, ts.factory.createIdentifier("createStaticElement")),
-                ts.factory.createImportSpecifier(false, undefined, ts.factory.createIdentifier("useMemoizedBlock")),
-            ]),
-        ),
-        ts.factory.createStringLiteral("@decillion/runtime"),
-    );
-
-    const statements = [runtimeImportDeclaration, ...file.statements];
-
-    return ts.factory.updateSourceFile(
-        file,
-        statements,
-        file.isDeclarationFile,
-        file.referencedFiles,
-        file.typeReferenceDirectives,
-        file.hasNoDefaultLib,
-        file.libReferenceDirectives,
-    );
 }
 
 /**
@@ -443,18 +413,4 @@ function topologicalSortElements(
     }
 
     return result;
-}
-
-/**
- * Adds signature comment to the file
- */
-function addSignatureComment(file: ts.SourceFile, signature: string): ts.SourceFile {
-    const commentNode = ts.addSyntheticLeadingComment(
-        file,
-        ts.SyntaxKind.SingleLineCommentTrivia,
-        ` ${signature}`,
-        true,
-    );
-
-    return commentNode;
 }

@@ -2,7 +2,7 @@ import * as ts from "typescript";
 import { beforeEach, describe, expect, it } from "vitest";
 
 // Import the class directly to create a new instance for testing
-import { robloxStaticDetector } from "../src/roblox-static-detector";
+import { robloxStaticDetector } from "../src/roblox-bridge";
 
 describe("RobloxStaticDetector", () => {
     let program: ts.Program;

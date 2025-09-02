@@ -115,18 +115,24 @@ describe("Code Generation", () => {
     });
 
     describe("createStaticElementCall", () => {
+        const mockTagToInstanceMap = new Map<string, string>([
+            ["textlabel", "TextLabel"],
+            ["frame", "Frame"],
+            ["textbutton", "TextButton"],
+        ]);
+
         it("should create call to createStaticElement with string tag", () => {
             const propsArg = ts.factory.createIdentifier("STATIC_PROPS_TEXTLABEL_abc123");
             const child = ts.factory.createStringLiteral("Hello");
 
-            const result = createStaticElementCall("textlabel", propsArg, [child]);
+            const result = createStaticElementCall("textlabel", propsArg, [child], mockTagToInstanceMap);
 
             expect(ts.isCallExpression(result)).toBe(true);
             expect(ts.isIdentifier(result.expression) && result.expression.text).toBe("createStaticElement");
             expect(result.arguments).toHaveLength(3);
 
             const tagArg = result.arguments[0];
-            expect(ts.isStringLiteral(tagArg) && tagArg.text).toBe("textlabel");
+            expect(ts.isStringLiteral(tagArg) && tagArg.text).toBe("TextLabel");
             expect(result.arguments[1]).toBe(propsArg);
             expect(result.arguments[2]).toBe(child);
         });
@@ -134,7 +140,7 @@ describe("Code Generation", () => {
         it("should create call with component identifier for PascalCase tags", () => {
             const propsArg = ts.factory.createIdentifier("undefined");
 
-            const result = createStaticElementCall("MyComponent", propsArg);
+            const result = createStaticElementCall("MyComponent", propsArg, [], mockTagToInstanceMap);
 
             const tagArg = result.arguments[0];
             expect(ts.isIdentifier(tagArg) && tagArg.text).toBe("MyComponent");
@@ -142,7 +148,7 @@ describe("Code Generation", () => {
 
         it("should handle no children", () => {
             const propsArg = ts.factory.createIdentifier("undefined");
-            const result = createStaticElementCall("frame", propsArg);
+            const result = createStaticElementCall("frame", propsArg, [], mockTagToInstanceMap);
 
             expect(result.arguments).toHaveLength(2); // tag + props only
         });
@@ -155,7 +161,7 @@ describe("Code Generation", () => {
                 ts.factory.createIdentifier("dynamicChild"),
             ];
 
-            const result = createStaticElementCall("frame", propsArg, children);
+            const result = createStaticElementCall("frame", propsArg, children, mockTagToInstanceMap);
 
             expect(result.arguments).toHaveLength(5); // tag + props + 3 children
         });

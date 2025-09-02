@@ -1,6 +1,6 @@
 -- Compiled with roblox-ts v3.0.0
 local TS = require(game:GetService("ReplicatedStorage"):WaitForChild("rbxts_include"):WaitForChild("RuntimeLib"))
-local useMemoizedBlock = TS.import(script, game:GetService("ReplicatedStorage"), "rbxts_include", "node_modules", "@decillion", "runtime", "out").useMemoizedBlock
+local useFinePatchBlock = TS.import(script, game:GetService("ReplicatedStorage"), "rbxts_include", "node_modules", "@decillion", "runtime", "out").useFinePatchBlock
 local _react = TS.import(script, game:GetService("ReplicatedStorage"), "rbxts_include", "node_modules", "@rbxts", "react")
 local React = _react
 local useState = _react.useState
@@ -39,7 +39,7 @@ local function OptimizedListItem(_param)
 	local name = _param.name
 	local value = _param.value
 	local isActive = _param.isActive
-	return useMemoizedBlock(function(isActive, name, value, id)
+	return useFinePatchBlock(function(isActive, name, value, id)
 		return React.createElement("frame", {
 			Size = UDim2.new(1, 0, 0, 40),
 			BackgroundColor3 = if isActive then Color3.fromRGB(100, 150, 100) else Color3.fromRGB(80, 80, 80),
@@ -55,7 +55,31 @@ local function OptimizedListItem(_param)
 			TextColor3 = Color3.fromRGB(200, 200, 200),
 			BackgroundTransparency = 1,
 		}))
-	end, { isActive, name, value, id }, "dynamic_frame_cv7coskeu")
+	end, { isActive, name, value, id }, { {
+		elementPath = {},
+		edits = { {
+			type = 8,
+			dependencyKey = "isActive",
+			propName = "BackgroundColor3",
+			path = {},
+		} },
+	}, {
+		elementPath = { 0, 0 },
+		edits = { {
+			type = 1,
+			dependencyKey = "name",
+			propName = "Text",
+			path = { 0, 0 },
+		} },
+	}, {
+		elementPath = { 0, 1 },
+		edits = { {
+			type = 1,
+			dependencyKey = "id",
+			propName = "Text",
+			path = { 0, 1 },
+		} },
+	} }, "dynamic_frame_bzv86dam0")
 end
 local function MassiveListBenchmark()
 	local itemCount, setItemCount = useState(1000)
@@ -95,78 +119,204 @@ local function MassiveListBenchmark()
 		end)
 	end
 	local ListComponent = if useOptimized then OptimizedListItem else TraditionalListItem
-	return React.createElement("frame", {
-		Size = UDim2.new(1, 0, 1, 0),
-		BackgroundColor3 = Color3.fromRGB(20, 20, 20),
-	}, React.createElement("frame", {
-		Size = UDim2.new(1, 0, 0, 100),
-		BackgroundColor3 = Color3.fromRGB(40, 40, 40),
-	}, React.createElement("textlabel", {
-		Text = `Massive List Benchmark - {itemCount} Items`,
-		Size = UDim2.new(1, 0, 0, 30),
-		TextColor3 = Color3.fromRGB(255, 255, 255),
-		BackgroundTransparency = 1,
-	}), React.createElement("textbutton", {
-		Text = if useOptimized then "Using Optimized" else "Using Traditional",
-		Size = UDim2.new(0.3, 0, 0, 30),
-		Position = UDim2.new(0, 0, 0, 35),
-		BackgroundColor3 = if useOptimized then Color3.fromRGB(0, 150, 0) else Color3.fromRGB(150, 150, 0),
-		TextColor3 = Color3.fromRGB(255, 255, 255),
-		Event = {
-			MouseButton1Click = function()
-				return setUseOptimized(not useOptimized)
-			end,
-		},
-	}), React.createElement("textbutton", {
-		Text = "Trigger Re-render",
-		Size = UDim2.new(0.3, 0, 0, 30),
-		Position = UDim2.new(0.35, 0, 0, 35),
-		BackgroundColor3 = Color3.fromRGB(100, 100, 150),
-		TextColor3 = Color3.fromRGB(255, 255, 255),
-		Event = {
-			MouseButton1Click = triggerUpdate,
-		},
-	}), React.createElement("textlabel", {
-		Text = `Last Render: {string.format("%.3f", renderTime)}ms`,
-		Size = UDim2.new(0.3, 0, 0, 30),
-		Position = UDim2.new(0.7, 0, 0, 35),
-		TextColor3 = Color3.fromRGB(200, 200, 200),
-		BackgroundTransparency = 1,
-	}), React.createElement("textlabel", {
-		Text = `Items: {itemCount}`,
-		Size = UDim2.new(0.5, 0, 0, 30),
-		Position = UDim2.new(0, 0, 0, 70),
-		TextColor3 = Color3.fromRGB(200, 200, 200),
-		BackgroundTransparency = 1,
-	})), useMemoizedBlock(function(itemCount, items, ListComponent)
-		local _exp = {
-			Size = UDim2.new(1, 0, 1, -100),
-			Position = UDim2.new(0, 0, 0, 100),
-			BackgroundColor3 = Color3.fromRGB(30, 30, 30),
-			CanvasSize = UDim2.new(0, 0, 0, itemCount * 45),
-			ScrollBarThickness = 10,
-		}
-		local _exp_1 = React.createElement("uilistlayout", {
-			SortOrder = Enum.SortOrder.LayoutOrder,
-			Padding = UDim.new(0, 5),
-		})
-		-- ▼ ReadonlyArray.map ▼
-		local _newValue = table.create(#items)
-		local _callback = function(item, index)
-			local _attributes = {
-				key = `item-{item.id}-{updateTrigger}`,
+	return useFinePatchBlock(function(itemCount, useOptimized, triggerUpdate, renderTime, items, ListComponent)
+		return React.createElement("frame", {
+			Size = UDim2.new(1, 0, 1, 0),
+			BackgroundColor3 = Color3.fromRGB(20, 20, 20),
+		}, useFinePatchBlock(function(itemCount, useOptimized, triggerUpdate, renderTime)
+			return React.createElement("frame", {
+				Size = UDim2.new(1, 0, 0, 100),
+				BackgroundColor3 = Color3.fromRGB(40, 40, 40),
+			}, React.createElement("textlabel", {
+				Text = `Massive List Benchmark - {itemCount} Items`,
+				Size = UDim2.new(1, 0, 0, 30),
+				TextColor3 = Color3.fromRGB(255, 255, 255),
+				BackgroundTransparency = 1,
+			}), React.createElement("textbutton", {
+				Text = if useOptimized then "Using Optimized" else "Using Traditional",
+				Size = UDim2.new(0.3, 0, 0, 30),
+				Position = UDim2.new(0, 0, 0, 35),
+				BackgroundColor3 = if useOptimized then Color3.fromRGB(0, 150, 0) else Color3.fromRGB(150, 150, 0),
+				TextColor3 = Color3.fromRGB(255, 255, 255),
+				Event = {
+					MouseButton1Click = function()
+						return setUseOptimized(not useOptimized)
+					end,
+				},
+			}), React.createElement("textbutton", {
+				Text = "Trigger Re-render",
+				Size = UDim2.new(0.3, 0, 0, 30),
+				Position = UDim2.new(0.35, 0, 0, 35),
+				BackgroundColor3 = Color3.fromRGB(100, 100, 150),
+				TextColor3 = Color3.fromRGB(255, 255, 255),
+				Event = {
+					MouseButton1Click = triggerUpdate,
+				},
+			}), React.createElement("textlabel", {
+				Text = `Last Render: {string.format("%.3f", renderTime)}ms`,
+				Size = UDim2.new(0.3, 0, 0, 30),
+				Position = UDim2.new(0.7, 0, 0, 35),
+				TextColor3 = Color3.fromRGB(200, 200, 200),
+				BackgroundTransparency = 1,
+			}), React.createElement("textlabel", {
+				Text = `Items: {itemCount}`,
+				Size = UDim2.new(0.5, 0, 0, 30),
+				Position = UDim2.new(0, 0, 0, 70),
+				TextColor3 = Color3.fromRGB(200, 200, 200),
+				BackgroundTransparency = 1,
+			}))
+		end, { itemCount, useOptimized, triggerUpdate, renderTime }, { {
+			elementPath = { 0, 0 },
+			edits = { {
+				type = 1,
+				dependencyKey = "itemCount",
+				propName = "Text",
+				path = { 0, 0 },
+			} },
+		}, {
+			elementPath = { 0, 1 },
+			edits = { {
+				type = 1,
+				dependencyKey = "useOptimized",
+				propName = "Text",
+				path = { 0, 1 },
+			}, {
+				type = 8,
+				dependencyKey = "useOptimized",
+				propName = "BackgroundColor3",
+				path = { 0, 1 },
+			} },
+		}, {
+			elementPath = { 0, 2 },
+			edits = { {
+				type = 4,
+				dependencyKey = "triggerUpdate",
+				propName = "Event",
+				path = { 0, 2 },
+			} },
+		}, {
+			elementPath = { 0, 3 },
+			edits = { {
+				type = 1,
+				dependencyKey = "renderTime",
+				propName = "Text",
+				path = { 0, 3 },
+			} },
+		}, {
+			elementPath = { 0, 4 },
+			edits = { {
+				type = 1,
+				dependencyKey = "itemCount",
+				propName = "Text",
+				path = { 0, 4 },
+			} },
+		} }, "dynamic_frame_90c2g2cf5"), useFinePatchBlock(function(itemCount, items, ListComponent)
+			local _exp = {
+				Size = UDim2.new(1, 0, 1, -100),
+				Position = UDim2.new(0, 0, 0, 100),
+				BackgroundColor3 = Color3.fromRGB(30, 30, 30),
+				CanvasSize = UDim2.new(0, 0, 0, itemCount * 45),
+				ScrollBarThickness = 10,
 			}
-			for _k, _v in item do
-				_attributes[_k] = _v
+			local _exp_1 = React.createElement("uilistlayout", {
+				SortOrder = Enum.SortOrder.LayoutOrder,
+				Padding = UDim.new(0, 5),
+			})
+			-- ▼ ReadonlyArray.map ▼
+			local _newValue = table.create(#items)
+			local _callback = function(item, index)
+				local _attributes = {
+					key = `item-{item.id}-{updateTrigger}`,
+				}
+				for _k, _v in item do
+					_attributes[_k] = _v
+				end
+				return React.createElement(ListComponent, _attributes)
 			end
-			return React.createElement(ListComponent, _attributes)
-		end
-		for _k, _v in items do
-			_newValue[_k] = _callback(_v, _k - 1, items)
-		end
-		-- ▲ ReadonlyArray.map ▲
-		return React.createElement("scrollingframe", _exp, _exp_1, _newValue)
-	end, { itemCount, items, ListComponent }, "dynamic_scrollingframe_fnm6x4h2j"))
+			for _k, _v in items do
+				_newValue[_k] = _callback(_v, _k - 1, items)
+			end
+			-- ▲ ReadonlyArray.map ▲
+			return React.createElement("scrollingframe", _exp, _exp_1, _newValue)
+		end, { itemCount, items, ListComponent }, { {
+			elementPath = {},
+			edits = { {
+				type = 1,
+				dependencyKey = "itemCount",
+				propName = "CanvasSize",
+				path = {},
+			} },
+		}, {
+			elementPath = { 0 },
+			edits = { {
+				type = 2,
+				dependencyKey = "items",
+				index = 1,
+				path = { 0, 1 },
+			} },
+		} }, "dynamic_scrollingframe_lfpefen23"))
+	end, { itemCount, useOptimized, triggerUpdate, renderTime, items, ListComponent }, { {
+		elementPath = { 0, 0, 0 },
+		edits = { {
+			type = 1,
+			dependencyKey = "itemCount",
+			propName = "Text",
+			path = { 0, 0, 0 },
+		} },
+	}, {
+		elementPath = { 0, 0, 1 },
+		edits = { {
+			type = 1,
+			dependencyKey = "useOptimized",
+			propName = "Text",
+			path = { 0, 0, 1 },
+		}, {
+			type = 8,
+			dependencyKey = "useOptimized",
+			propName = "BackgroundColor3",
+			path = { 0, 0, 1 },
+		} },
+	}, {
+		elementPath = { 0, 0, 2 },
+		edits = { {
+			type = 4,
+			dependencyKey = "triggerUpdate",
+			propName = "Event",
+			path = { 0, 0, 2 },
+		} },
+	}, {
+		elementPath = { 0, 0, 3 },
+		edits = { {
+			type = 1,
+			dependencyKey = "renderTime",
+			propName = "Text",
+			path = { 0, 0, 3 },
+		} },
+	}, {
+		elementPath = { 0, 0, 4 },
+		edits = { {
+			type = 1,
+			dependencyKey = "itemCount",
+			propName = "Text",
+			path = { 0, 0, 4 },
+		} },
+	}, {
+		elementPath = { 0, 1 },
+		edits = { {
+			type = 1,
+			dependencyKey = "itemCount",
+			propName = "CanvasSize",
+			path = { 0, 1 },
+		} },
+	}, {
+		elementPath = { 0, 1 },
+		edits = { {
+			type = 2,
+			dependencyKey = "items",
+			index = 1,
+			path = { 0, 1, 1 },
+		} },
+	} }, "dynamic_frame_v4op7piiz")
 end
 -- Alternative ways to use @undecillion
 -- Comment-style for arrow functions

@@ -432,7 +432,8 @@ export class BlockAnalyzer {
         const complexityScore = blockInfo.dynamicProps.length + (blockInfo.hasDynamicChildren ? 2 : 0);
 
         // Require a minimum complexity threshold to justify memoization overhead
-        if (complexityScore < 3) {
+        // Changed from 3 to 2 to allow memoization for components with 2 dependencies
+        if (complexityScore < 2) {
             return false;
         }
 
@@ -512,7 +513,8 @@ export class BlockAnalyzer {
     private generateElementPatchInstruction(
         node: ts.JsxElement | ts.JsxSelfClosingElement,
         elementPath: number[],
-        elementPaths: Map<ts.Node, number[]>,
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        _elementPaths: Map<ts.Node, number[]>,
     ): PatchInstruction {
         const edits: (PropEdit | ChildEdit)[] = [];
         const attributes = this.getJsxAttributes(node);
@@ -609,7 +611,16 @@ export class BlockAnalyzer {
         // Categorize props by their update type
         if (propName.toLowerCase().includes("style") || propName === "BackgroundColor3" || propName === "TextColor3") {
             return EditType.Style;
-        } else if (propName.startsWith("on") || propName.includes("Event")) {
+        } else if (
+            propName.startsWith("on") ||
+            propName.includes("Event") ||
+            propName.includes("Click") ||
+            propName.includes("Changed") ||
+            propName.includes("Activated") ||
+            propName.startsWith("Mouse") ||
+            propName.startsWith("Touch") ||
+            propName.includes("Input")
+        ) {
             return EditType.Event;
         } else {
             return EditType.Attribute;
