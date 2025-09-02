@@ -45,6 +45,40 @@ export interface TransformResult {
     staticElement?: StaticElementInfo;
 }
 
+/**
+ * Edit types for fine-grained updates (similar to Million.js)
+ */
+export const enum EditType {
+    Attribute = 1,
+    Child = 2,
+    Event = 4,
+    Style = 8,
+}
+
+export interface PropEdit {
+    type: EditType;
+    propName: string;
+    dependencyKey: string; // Which dependency this edit depends on
+    path?: number[]; // Path to the element in the tree (for nested elements)
+}
+
+export interface ChildEdit {
+    type: EditType.Child;
+    index: number;
+    dependencyKey: string;
+    path?: number[];
+}
+
+export interface PatchInstruction {
+    elementPath: number[]; // Path to the element in the component tree
+    edits: (PropEdit | ChildEdit)[];
+}
+
+export interface FinePatchBlockInfo extends BlockInfo {
+    patchInstructions: PatchInstruction[];
+    elementPaths: Map<ts.Node, number[]>; // Map JSX nodes to their paths
+}
+
 export interface OptimizationContext {
     typeChecker: ts.TypeChecker;
     context: ts.TransformationContext;

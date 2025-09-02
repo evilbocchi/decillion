@@ -2,10 +2,10 @@ import * as ts from "typescript";
 import { BlockAnalyzer } from "./analyzer";
 import {
     DecillionTransformer,
-    transformJsxElement,
-    hasUndecillionDecorator,
     getFunctionName,
+    hasUndecillionDecorator,
     shouldSkipTransformation,
+    transformJsxElementWithFinePatch,
 } from "./transformer";
 import type { OptimizationContext, PropInfo, StaticElementInfo } from "./types";
 
@@ -121,7 +121,7 @@ export default function (program: ts.Program, options: DecillionTransformerOptio
                     }
 
                     needsRuntimeImport = true;
-                    const result = transformJsxElement(node, optimizationContext);
+                    const result = transformJsxElementWithFinePatch(node, optimizationContext);
 
                     // Store any static elements that were generated
                     if (result.staticElement) {

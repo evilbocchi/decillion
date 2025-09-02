@@ -7,9 +7,10 @@ import {
     generateBlockId,
     generateStaticElementId,
     generateStaticPropsId,
+    createDependenciesArray,
 } from "./codegen";
 import { robloxStaticDetector } from "./roblox-bridge";
-import type { OptimizationContext, PropInfo, StaticElementInfo, TransformResult } from "./types";
+import type { OptimizationContext, PropInfo, StaticElementInfo, TransformResult, PatchInstruction } from "./types";
 
 /**
  * Creates the appropriate tag reference for React.createElement
@@ -149,7 +150,173 @@ export class DecillionTransformer {
 }
 
 /**
+ * Transforms a JSX element into optimized code using BlockAnalyzer with fine-grained patching
+ */
+export function transformJsxElementWithFinePatch(
+    node: ts.JsxElement | ts.JsxSelfClosingElement,
+    context: OptimizationContext,
+): TransformResult {
+    const transformer = new DecillionTransformer(context.typeChecker, context.context, context.blockAnalyzer);
+
+    const blockInfo = transformer.analyzeJsxElement(node);
+    const tagName = context.blockAnalyzer!.getJsxTagName(node);
+
+    if (blockInfo.isStatic) {
+        return generateStaticElement(node, tagName, context);
+    }
+
+    if (context.blockAnalyzer!.shouldMemoizeBlock(blockInfo)) {
+        // Use fine-grained patching for complex blocks
+        return generateFinePatchBlock(node, blockInfo, tagName, context);
+    }
+
+    return generateOptimizedElement(node, tagName, context);
+}
+
+/**
+ * Generates a fine-grained patch block
+ */
+function generateFinePatchBlock(
+    node: ts.JsxElement | ts.JsxSelfClosingElement,
+    blockInfo: BlockInfo,
+    tagName: string,
+    context: OptimizationContext,
+): TransformResult {
+    const blockId = generateBlockId(tagName);
+    const allProps = extractPropsFromJsx(node);
+    const children = extractOptimizedChildren(node, context);
+
+    // Generate patch instructions
+    const finePatchInfo = context.blockAnalyzer!.generatePatchInstructions(node);
+
+    // Create the React.createElement call inside the arrow function
+    const createElementCall = ts.factory.createCallExpression(
+        ts.factory.createPropertyAccessExpression(
+            ts.factory.createIdentifier("React"),
+            ts.factory.createIdentifier("createElement"),
+        ),
+        undefined,
+        [
+            createTagReference(tagName),
+            allProps.length > 0 ? createPropsObject(allProps) : ts.factory.createIdentifier("undefined"),
+            ...children,
+        ],
+    );
+
+    const parameters = new Array<ts.ParameterDeclaration>();
+
+    // Create parameters for dependencies
+    const processedDependencies = new Set<string>();
+    for (const dep of blockInfo.dependencies) {
+        if (processedDependencies.has(dep)) continue;
+        processedDependencies.add(dep);
+
+        let typeNode: ts.TypeNode | undefined;
+        if (blockInfo.dependencyTypes?.has(dep)) {
+            const depInfo = blockInfo.dependencyTypes.get(dep)!;
+            typeNode = depInfo.type;
+        }
+
+        parameters.push(
+            ts.factory.createParameterDeclaration(
+                undefined,
+                undefined,
+                ts.factory.createIdentifier(dep),
+                undefined,
+                typeNode,
+                undefined,
+            ),
+        );
+    }
+
+    const arrowFunction = ts.factory.createArrowFunction(
+        undefined,
+        undefined,
+        parameters,
+        undefined,
+        ts.factory.createToken(ts.SyntaxKind.EqualsGreaterThanToken),
+        createElementCall,
+    );
+
+    // Create patch instructions array literal
+    const patchInstructionsArray = createPatchInstructionsLiteral(finePatchInfo.patchInstructions);
+
+    // Use fine-grained patch function
+    const finalDependencies = Array.from(processedDependencies);
+
+    return {
+        element: ts.factory.createCallExpression(ts.factory.createIdentifier("useFinePatchBlock"), undefined, [
+            arrowFunction,
+            createDependenciesArray(finalDependencies),
+            patchInstructionsArray,
+            ts.factory.createStringLiteral(blockId),
+        ]),
+        needsRuntimeImport: true,
+    };
+}
+
+/**
+ * Creates a literal array of patch instructions
+ */
+function createPatchInstructionsLiteral(patchInstructions: PatchInstruction[]): ts.ArrayLiteralExpression {
+    const instructionLiterals = patchInstructions.map((instruction) => {
+        const editsArray = ts.factory.createArrayLiteralExpression(
+            instruction.edits.map((edit) => {
+                const editProperties = [
+                    ts.factory.createPropertyAssignment("type", ts.factory.createNumericLiteral(edit.type.toString())),
+                    ts.factory.createPropertyAssignment(
+                        "dependencyKey",
+                        ts.factory.createStringLiteral(edit.dependencyKey),
+                    ),
+                ];
+
+                if ("propName" in edit) {
+                    editProperties.push(
+                        ts.factory.createPropertyAssignment("propName", ts.factory.createStringLiteral(edit.propName)),
+                    );
+                }
+
+                if ("index" in edit) {
+                    editProperties.push(
+                        ts.factory.createPropertyAssignment(
+                            "index",
+                            ts.factory.createNumericLiteral(edit.index.toString()),
+                        ),
+                    );
+                }
+
+                if (edit.path) {
+                    editProperties.push(
+                        ts.factory.createPropertyAssignment(
+                            "path",
+                            ts.factory.createArrayLiteralExpression(
+                                edit.path.map((p) => ts.factory.createNumericLiteral(p.toString())),
+                            ),
+                        ),
+                    );
+                }
+
+                return ts.factory.createObjectLiteralExpression(editProperties);
+            }),
+        );
+
+        return ts.factory.createObjectLiteralExpression([
+            ts.factory.createPropertyAssignment(
+                "elementPath",
+                ts.factory.createArrayLiteralExpression(
+                    instruction.elementPath.map((p) => ts.factory.createNumericLiteral(p.toString())),
+                ),
+            ),
+            ts.factory.createPropertyAssignment("edits", editsArray),
+        ]);
+    });
+
+    return ts.factory.createArrayLiteralExpression(instructionLiterals);
+}
+
+/**
  * Transforms a JSX element into optimized code using BlockAnalyzer
+ * @deprecated Use transformJsxElementWithFinePatch
  */
 export function transformJsxElement(
     node: ts.JsxElement | ts.JsxSelfClosingElement,
@@ -423,7 +590,7 @@ function extractStaticChildren(
                 children.push(ts.factory.createStringLiteral(text));
             }
         } else if (ts.isJsxElement(child) || ts.isJsxSelfClosingElement(child)) {
-            const childResult = transformJsxElement(child, context);
+            const childResult = transformJsxElementWithFinePatch(child, context);
             if (childResult.staticPropsTable) {
                 // Store static props table for child
                 context.staticPropsTables.set(childResult.staticPropsTable.id, childResult.staticPropsTable.props);
@@ -459,7 +626,7 @@ function extractOptimizedChildren(
                 children.push(ts.factory.createStringLiteral(text));
             }
         } else if (ts.isJsxElement(child) || ts.isJsxSelfClosingElement(child)) {
-            const childResult = transformJsxElement(child, context);
+            const childResult = transformJsxElementWithFinePatch(child, context);
             if (childResult.staticPropsTable) {
                 context.staticPropsTables.set(childResult.staticPropsTable.id, childResult.staticPropsTable.props);
             }

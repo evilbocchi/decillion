@@ -1,6 +1,7 @@
 import * as ts from "typescript";
 import { robloxStaticDetector } from "./roblox-bridge";
-import type { DependencyInfo } from "./types";
+import type { DependencyInfo, PropEdit, ChildEdit, PatchInstruction, FinePatchBlockInfo } from "./types";
+import { EditType } from "./types";
 
 export interface BlockInfo {
     id: string;
@@ -449,5 +450,169 @@ export class BlockAnalyzer {
 
     getAllBlocks(): Map<ts.Node, BlockInfo> {
         return this.blocks;
+    }
+
+    /**
+     * Generates fine-grained patch instructions for a block
+     * This enables updating individual properties instead of re-rendering entire components
+     */
+    generatePatchInstructions(node: ts.JsxElement | ts.JsxSelfClosingElement): FinePatchBlockInfo {
+        const blockInfo = this.analyzeJsxElement(node);
+        const patchInstructions: PatchInstruction[] = [];
+        const elementPaths = new Map<ts.Node, number[]>();
+
+        // Generate path for current element
+        this.assignElementPaths(node, [], elementPaths);
+
+        // Generate patch instructions for this element's props
+        const elementInstruction = this.generateElementPatchInstruction(node, [], elementPaths);
+        if (elementInstruction.edits.length > 0) {
+            patchInstructions.push(elementInstruction);
+        }
+
+        // Generate patch instructions for children
+        if (ts.isJsxElement(node)) {
+            this.generateChildPatchInstructions(node, [0], elementPaths, patchInstructions);
+        }
+
+        return {
+            ...blockInfo,
+            patchInstructions,
+            elementPaths,
+        };
+    }
+
+    /**
+     * Assigns element paths for navigation during patching
+     */
+    private assignElementPaths(
+        node: ts.JsxElement | ts.JsxSelfClosingElement,
+        currentPath: number[],
+        elementPaths: Map<ts.Node, number[]>,
+    ): void {
+        elementPaths.set(node, [...currentPath]);
+
+        if (ts.isJsxElement(node)) {
+            let childIndex = 0;
+            for (const child of node.children) {
+                if (ts.isJsxElement(child) || ts.isJsxSelfClosingElement(child)) {
+                    this.assignElementPaths(child, [...currentPath, childIndex], elementPaths);
+                    childIndex++;
+                } else if (ts.isJsxExpression(child) && child.expression) {
+                    // JSX expressions also count as children
+                    childIndex++;
+                }
+            }
+        }
+    }
+
+    /**
+     * Generates patch instructions for a single element's properties
+     */
+    private generateElementPatchInstruction(
+        node: ts.JsxElement | ts.JsxSelfClosingElement,
+        elementPath: number[],
+        elementPaths: Map<ts.Node, number[]>,
+    ): PatchInstruction {
+        const edits: (PropEdit | ChildEdit)[] = [];
+        const attributes = this.getJsxAttributes(node);
+
+        for (const attr of attributes) {
+            if (ts.isJsxAttribute(attr) && attr.initializer) {
+                const propName = ts.isIdentifier(attr.name) ? attr.name.text : attr.name.getText();
+
+                if (ts.isJsxExpression(attr.initializer) && attr.initializer.expression) {
+                    if (this.isDynamicExpression(attr.initializer.expression)) {
+                        // Find which dependency this prop depends on
+                        const dependencies: string[] = [];
+                        this.extractDependencies(attr.initializer.expression, dependencies);
+
+                        // For now, we'll use the first dependency as the key
+                        // In a more sophisticated system, you might want to track multiple dependencies per edit
+                        if (dependencies.length > 0) {
+                            const editType = this.getEditTypeForProp(propName);
+                            edits.push({
+                                type: editType,
+                                propName,
+                                dependencyKey: dependencies[0],
+                                path: elementPath,
+                            } as PropEdit);
+                        }
+                    }
+                }
+            }
+        }
+
+        return {
+            elementPath,
+            edits,
+        };
+    }
+
+    /**
+     * Generates patch instructions for children
+     */
+    private generateChildPatchInstructions(
+        node: ts.JsxElement,
+        basePath: number[],
+        elementPaths: Map<ts.Node, number[]>,
+        patchInstructions: PatchInstruction[],
+    ): void {
+        let childIndex = 0;
+
+        for (const child of node.children) {
+            if (ts.isJsxElement(child) || ts.isJsxSelfClosingElement(child)) {
+                const childPath = [...basePath, childIndex];
+
+                // Generate patch instructions for this child element
+                const childInstruction = this.generateElementPatchInstruction(child, childPath, elementPaths);
+                if (childInstruction.edits.length > 0) {
+                    patchInstructions.push(childInstruction);
+                }
+
+                // Recursively process nested children
+                if (ts.isJsxElement(child)) {
+                    this.generateChildPatchInstructions(child, childPath, elementPaths, patchInstructions);
+                }
+
+                childIndex++;
+            } else if (ts.isJsxExpression(child) && child.expression) {
+                // Dynamic child content
+                if (this.isDynamicExpression(child.expression)) {
+                    const dependencies: string[] = [];
+                    this.extractDependencies(child.expression, dependencies);
+
+                    if (dependencies.length > 0) {
+                        const childPath = [...basePath, childIndex];
+                        patchInstructions.push({
+                            elementPath: basePath, // Parent element path
+                            edits: [
+                                {
+                                    type: EditType.Child,
+                                    index: childIndex,
+                                    dependencyKey: dependencies[0],
+                                    path: childPath,
+                                } as ChildEdit,
+                            ],
+                        });
+                    }
+                }
+                childIndex++;
+            }
+        }
+    }
+
+    /**
+     * Determines the edit type for a given property name
+     */
+    private getEditTypeForProp(propName: string): EditType {
+        // Categorize props by their update type
+        if (propName.toLowerCase().includes("style") || propName === "BackgroundColor3" || propName === "TextColor3") {
+            return EditType.Style;
+        } else if (propName.startsWith("on") || propName.includes("Event")) {
+            return EditType.Event;
+        } else {
+            return EditType.Attribute;
+        }
     }
 }

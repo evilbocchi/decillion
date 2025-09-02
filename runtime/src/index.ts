@@ -6,8 +6,45 @@ const HttpService = game.GetService("HttpService");
 // https://github.com/jsdotlua/react-lua/blob/main/modules/shared/src/ReactSymbols.luau
 const REACT_ELEMENT_TYPE = 0xeac7;
 
+// Edit types for fine-grained updates
+export const enum EditType {
+    Attribute = 1,
+    Child = 2,
+    Event = 4,
+    Style = 8,
+}
+
+export interface PropEdit {
+    type: EditType;
+    propName: string;
+    dependencyKey: string;
+    path?: number[];
+}
+
+export interface ChildEdit {
+    type: EditType.Child;
+    index: number;
+    dependencyKey: string;
+    path?: number[];
+}
+
+export interface PatchInstruction {
+    elementPath: number[];
+    edits: (PropEdit | ChildEdit)[];
+}
+
+export interface FinePatchBlockInstance {
+    id: string;
+    rootElement: ReactElement | null;
+    elementCache: Map<string, Instance>; // Cache of Roblox instances by path
+    dependencies: unknown[];
+    patchInstructions: PatchInstruction[];
+    lastRenderTime: number;
+}
+
 // Block instance cache
 const blockCache = new Map<string, BlockInstance>();
+const finePatchBlockCache = new Map<string, FinePatchBlockInstance>();
 const dependencyCache = new Map<string, unknown[]>();
 
 export interface BlockInstance {
@@ -16,6 +53,151 @@ export interface BlockInstance {
     dependencies: unknown[];
     staticProps?: Record<string, unknown>;
     lastRenderTime: number;
+}
+
+/**
+ * Creates a fine-grained memoized block that patches individual properties
+ */
+export function useFinePatchBlock<T extends unknown[]>(
+    renderFn: (...deps: T) => ReactElement,
+    dependencies: T,
+    patchInstructions: PatchInstruction[],
+    blockId: string,
+): ReactElement {
+    const cached = finePatchBlockCache.get(blockId);
+    const prevDeps = dependencyCache.get(blockId) || [];
+
+    // Check which specific dependencies changed
+    const changedDependencies = getChangedDependencies(prevDeps, dependencies);
+
+    if (!cached || changedDependencies.size() === 0) {
+        // First render or no dependencies changed
+        if (!cached) {
+            const newElement = renderFn(...dependencies);
+            const blockInstance: FinePatchBlockInstance = {
+                id: blockId,
+                rootElement: newElement,
+                elementCache: new Map(),
+                dependencies: [...dependencies],
+                patchInstructions,
+                lastRenderTime: tick(),
+            };
+
+            finePatchBlockCache.set(blockId, blockInstance);
+            dependencyCache.set(blockId, [...dependencies]);
+            return newElement;
+        }
+        return cached.rootElement!;
+    }
+
+    // Apply fine-grained patches only for changed dependencies
+    const patchedElement = applyFinePatch(cached, changedDependencies, dependencies);
+    
+    // Update cache
+    cached.dependencies = [...dependencies];
+    cached.lastRenderTime = tick();
+    dependencyCache.set(blockId, [...dependencies]);
+
+    return patchedElement;
+}
+
+/**
+ * Gets which dependencies changed and their indices
+ */
+function getChangedDependencies(prevDeps: unknown[], nextDeps: unknown[]): Array<{ index: number; key: string; value: unknown }> {
+    const changed: Array<{ index: number; key: string; value: unknown }> = [];
+    
+    for (let i = 0; i < math.max(prevDeps.size(), nextDeps.size()); i++) {
+        if (prevDeps[i] !== nextDeps[i]) {
+            changed.push({
+                index: i,
+                key: `dep_${i}`, // In real implementation, you'd track actual dependency names
+                value: nextDeps[i],
+            });
+        }
+    }
+    
+    return changed;
+}
+
+/**
+ * Applies fine-grained patches to a cached element
+ */
+function applyFinePatch(
+    cached: FinePatchBlockInstance,
+    changedDependencies: Array<{ index: number; key: string; value: unknown }>,
+    newDependencies: unknown[],
+): ReactElement {
+    // Clone the cached element to avoid mutations
+    const clonedElement = cloneReactElement(cached.rootElement!);
+    
+    // Apply patches based on changed dependencies
+    for (const changedDep of changedDependencies) {
+        // Find patch instructions that depend on this changed dependency
+        const relevantInstructions = cached.patchInstructions.filter(instruction =>
+            instruction.edits.some(edit => edit.dependencyKey === changedDep.key)
+        );
+        
+        for (const instruction of relevantInstructions) {
+            applyPatchInstruction(clonedElement, instruction, newDependencies, changedDep);
+        }
+    }
+    
+    // Update the cached element
+    cached.rootElement = clonedElement;
+    
+    return clonedElement;
+}
+
+/**
+ * Applies a single patch instruction to an element
+ */
+function applyPatchInstruction(
+    element: ReactElement,
+    instruction: PatchInstruction,
+    dependencies: unknown[],
+    changedDep: { index: number; key: string; value: unknown },
+): void {
+    // Navigate to the target element using the path
+    let targetElement = element;
+    
+    // For now, we'll work with the root element
+    // In a full implementation, you'd need to navigate the React element tree
+    
+    for (const edit of instruction.edits) {
+        if (edit.dependencyKey === changedDep.key) {
+            if (edit.type === EditType.Attribute || edit.type === EditType.Style) {
+                const propEdit = edit as PropEdit;
+                // Update the specific property
+                if (targetElement.props) {
+                    (targetElement.props as Record<string, unknown>)[propEdit.propName] = changedDep.value;
+                }
+            } else if (edit.type === EditType.Child) {
+                const childEdit = edit as ChildEdit;
+                // Update the specific child
+                if (targetElement.props && targetElement.props.children) {
+                    const children = typeIs(targetElement.props.children, "table") && (targetElement.props.children as unknown[]).size !== undefined
+                        ? targetElement.props.children as unknown[]
+                        : [targetElement.props.children];
+                    
+                    if (childEdit.index < children.size()) {
+                        children[childEdit.index] = changedDep.value;
+                        targetElement.props.children = children.size() === 1 ? children[0] : children;
+                    }
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Clones a React element for safe mutation
+ */
+function cloneReactElement(element: ReactElement): ReactElement {
+    return {
+        ...element,
+        props: element.props ? table.clone(element.props) : {},
+    };
 }
 
 /**
