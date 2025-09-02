@@ -77,6 +77,19 @@ class RobloxBridge {
         this.initialized = true;
     }
 
+    /**
+     * Get a mapping of tag names to instance names for Roblox elements
+     *
+     * @returns A map of tag names to instance names
+     */
+    getTagToInstanceNameMap() {
+        const map = new Map<string, string>();
+        for (const instanceName of this.staticConstructors) {
+            map.set(instanceName.toLowerCase(), instanceName);
+        }
+        return map;
+    }
+
     private resolveRobloxDTs(program: ts.Program): ts.ResolvedModuleFull | undefined {
         // First try the standard TypeScript module resolution
         const standardResolve = ts.resolveModuleName(

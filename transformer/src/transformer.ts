@@ -124,6 +124,7 @@ export class DecillionTransformer {
             blockAnalyzer,
             skipTransformFunctions: new Set<string>(),
             functionContextStack: [],
+            tagToInstanceNameMap: robloxStaticDetector.getTagToInstanceNameMap(),
         };
     }
 
@@ -194,7 +195,7 @@ function generateStaticElement(
         propsArg = ts.factory.createIdentifier("undefined");
     }
 
-    const elementCall = createStaticElementCall(tagName, propsArg, children);
+    const elementCall = createStaticElementCall(tagName, propsArg, children, context.tagToInstanceNameMap);
 
     // Check if we should extract the full static element to module level
     if (extractFullElement && isCompletelyStatic(node, context)) {

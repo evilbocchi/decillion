@@ -52,14 +52,14 @@ export function generateBlockId(tagName: string): string {
  * - Lowercase tags (frame, textlabel) become string literals
  * - PascalCase tags (Counter, MyComponent) become identifiers
  */
-function createTagReference(tagName: string): ts.Expression {
+function createTagReference(tagName: string, tagToInstanceNameMap: Map<string, string>): ts.Expression {
     // Check if tag name starts with uppercase (PascalCase component)
     if (tagName[0] && tagName[0] === tagName[0].toUpperCase()) {
         // React component - use identifier
         return ts.factory.createIdentifier(tagName);
     } else {
         // HTML-like element - use string literal
-        return ts.factory.createStringLiteral(tagName);
+        return ts.factory.createStringLiteral(tagToInstanceNameMap.get(tagName.toLowerCase()) || tagName);
     }
 }
 
@@ -70,9 +70,10 @@ export function createStaticElementCall(
     tagName: string,
     propsArg: ts.Expression,
     children: ts.Expression[] = [],
+    tagToInstanceNameMap: Map<string, string>,
 ): ts.CallExpression {
     return ts.factory.createCallExpression(ts.factory.createIdentifier("createStaticElement"), undefined, [
-        createTagReference(tagName),
+        createTagReference(tagName, tagToInstanceNameMap),
         propsArg,
         ...children,
     ]);

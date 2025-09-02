@@ -58,4 +58,6 @@ export interface OptimizationContext {
     skipTransformFunctions: Set<string>;
     /** Stack of current function context to track if we're inside a skip function */
     functionContextStack: string[];
+    /** Map of tag names to Roblox instance names */
+    tagToInstanceNameMap: Map<string, string>;
 }
