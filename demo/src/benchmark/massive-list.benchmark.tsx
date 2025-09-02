@@ -63,7 +63,7 @@ function OptimizedListItem({ id, name, value, isActive }: ListItemProps) {
 }
 
 export default function MassiveListBenchmark() {
-    const [itemCount, setItemCount] = useState(100);
+    const [itemCount, setItemCount] = useState(1000);
     const [useOptimized, setUseOptimized] = useState(true);
     const [updateTrigger, setUpdateTrigger] = useState(0);
     const [renderTime, setRenderTime] = useState(0);
@@ -86,7 +86,7 @@ export default function MassiveListBenchmark() {
         // Measure render time (simplified)
         task.spawn(() => {
             task.wait();
-            setRenderTime(tick() - startTime);
+            setRenderTime((tick() - startTime) * 1000);
         });
     };
 

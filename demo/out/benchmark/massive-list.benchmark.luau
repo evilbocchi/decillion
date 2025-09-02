@@ -50,7 +50,7 @@ local function OptimizedListItem(_param)
 				TextColor3 = Color3.fromRGB(255, 255, 255),
 				BackgroundTransparency = 1,
 			})
-		end, { name, value }, "dynamic_textlabel_cfzh1mz2q"), useMemoizedBlock(function(id)
+		end, { name, value }, "dynamic_textlabel_ndx7bgoft"), useMemoizedBlock(function(id)
 			return React.createElement("textlabel", {
 				Text = `#{id}`,
 				Size = UDim2.new(0.2, 0, 1, 0),
@@ -58,11 +58,11 @@ local function OptimizedListItem(_param)
 				TextColor3 = Color3.fromRGB(200, 200, 200),
 				BackgroundTransparency = 1,
 			})
-		end, { id }, "dynamic_textlabel_tti7k7tdw"))
-	end, { isActive, name, value, id }, "dynamic_frame_hhhpxste7")
+		end, { id }, "dynamic_textlabel_jd6jxh2je"))
+	end, { isActive, name, value, id }, "dynamic_frame_47y223mro")
 end
 local function MassiveListBenchmark()
-	local itemCount, setItemCount = useState(100)
+	local itemCount, setItemCount = useState(1000)
 	local useOptimized, setUseOptimized = useState(true)
 	local updateTrigger, setUpdateTrigger = useState(0)
 	local renderTime, setRenderTime = useState(0)
@@ -95,7 +95,7 @@ local function MassiveListBenchmark()
 		-- Measure render time (simplified)
 		task.spawn(function()
 			task.wait()
-			setRenderTime(tick() - startTime)
+			setRenderTime((tick() - startTime) * 1000)
 		end)
 	end
 	local ListComponent = if useOptimized then OptimizedListItem else TraditionalListItem
@@ -114,7 +114,7 @@ local function MassiveListBenchmark()
 					TextColor3 = Color3.fromRGB(255, 255, 255),
 					BackgroundTransparency = 1,
 				})
-			end, { itemCount }, "dynamic_textlabel_mpygtkckg"), useMemoizedBlock(function(useOptimized)
+			end, { itemCount }, "dynamic_textlabel_00appkvs1"), useMemoizedBlock(function(useOptimized)
 				return React.createElement("textbutton", {
 					Text = if useOptimized then "Using Optimized" else "Using Traditional",
 					Size = UDim2.new(0.3, 0, 0, 30),
@@ -127,7 +127,7 @@ local function MassiveListBenchmark()
 						end,
 					},
 				})
-			end, { useOptimized }, "dynamic_textbutton_u94o2gt8g"), useMemoizedBlock(function(triggerUpdate)
+			end, { useOptimized }, "dynamic_textbutton_n1za9dun6"), useMemoizedBlock(function(triggerUpdate)
 				return React.createElement("textbutton", {
 					Text = "Trigger Re-render",
 					Size = UDim2.new(0.3, 0, 0, 30),
@@ -138,7 +138,7 @@ local function MassiveListBenchmark()
 						MouseButton1Click = triggerUpdate,
 					},
 				})
-			end, { triggerUpdate }, "dynamic_textbutton_sdsv59jlr"), useMemoizedBlock(function(renderTime)
+			end, { triggerUpdate }, "dynamic_textbutton_0xid410sw"), useMemoizedBlock(function(renderTime)
 				return React.createElement("textlabel", {
 					Text = `Last Render: {string.format("%.3f", renderTime)}ms`,
 					Size = UDim2.new(0.3, 0, 0, 30),
@@ -146,7 +146,7 @@ local function MassiveListBenchmark()
 					TextColor3 = Color3.fromRGB(200, 200, 200),
 					BackgroundTransparency = 1,
 				})
-			end, { renderTime }, "dynamic_textlabel_6094y0xxt"), useMemoizedBlock(function(itemCount)
+			end, { renderTime }, "dynamic_textlabel_glzwoau3f"), useMemoizedBlock(function(itemCount)
 				return React.createElement("textlabel", {
 					Text = `Items: {itemCount}`,
 					Size = UDim2.new(0.5, 0, 0, 30),
@@ -154,8 +154,8 @@ local function MassiveListBenchmark()
 					TextColor3 = Color3.fromRGB(200, 200, 200),
 					BackgroundTransparency = 1,
 				})
-			end, { itemCount }, "dynamic_textlabel_vps1z1nhv"))
-		end, { itemCount, useOptimized, triggerUpdate, renderTime }, "dynamic_frame_8q93ghayk"), useMemoizedBlock(function(itemCount, items, ListComponent)
+			end, { itemCount }, "dynamic_textlabel_ljnks24cx"))
+		end, { itemCount, useOptimized, triggerUpdate, renderTime }, "dynamic_frame_w9f5nwswv"), useMemoizedBlock(function(itemCount, items, ListComponent)
 			local _exp = {
 				Size = UDim2.new(1, 0, 1, -100),
 				Position = UDim2.new(0, 0, 0, 100),
@@ -183,8 +183,8 @@ local function MassiveListBenchmark()
 			end
 			-- ▲ ReadonlyArray.map ▲
 			return React.createElement("scrollingframe", _exp, _exp_1, _newValue)
-		end, { itemCount, items, ListComponent }, "dynamic_scrollingframe_gaxzaouc3"))
-	end, { itemCount, useOptimized, triggerUpdate, renderTime, items, ListComponent }, "dynamic_frame_fd5ojj09v")
+		end, { itemCount, items, ListComponent }, "dynamic_scrollingframe_xsnwuv0n5"))
+	end, { itemCount, useOptimized, triggerUpdate, renderTime, items, ListComponent }, "dynamic_frame_ite2hsp7d")
 end
 -- Alternative ways to use @undecillion
 -- Comment-style for arrow functions
@@ -198,7 +198,7 @@ local SkippedArrowComponent = function(_param)
 			BackgroundTransparency = 1,
 			TextColor3 = Color3.fromRGB(255, 255, 255),
 		})
-	end, { text }, "dynamic_textlabel_ez9gumbwo")
+	end, { text }, "dynamic_textlabel_2yjug2bdq")
 end
 -- JSDoc-style documentation
 --[[
