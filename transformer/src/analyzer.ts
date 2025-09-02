@@ -95,7 +95,18 @@ export class BlockAnalyzer {
                     if (!childBlock.isStatic) {
                         blockInfo.hasDynamicChildren = true;
                         blockInfo.isStatic = false;
-                        blockInfo.dependencies.push(...childBlock.dependencies);
+                        
+                        // Merge dependencies and their types from child blocks
+                        for (const dep of childBlock.dependencies) {
+                            if (!blockInfo.dependencies.includes(dep)) {
+                                blockInfo.dependencies.push(dep);
+                                
+                                // Also merge the dependency type information
+                                if (childBlock.dependencyTypes?.has(dep) && blockInfo.dependencyTypes) {
+                                    blockInfo.dependencyTypes.set(dep, childBlock.dependencyTypes.get(dep)!);
+                                }
+                            }
+                        }
                     }
                 } else if (ts.isJsxExpression(child) && child.expression) {
                     if (this.isDynamicExpression(child.expression)) {
@@ -107,8 +118,22 @@ export class BlockAnalyzer {
             }
         }
 
-        // Remove duplicates from dependencies
-        blockInfo.dependencies = [...new Set(blockInfo.dependencies)];
+        // Remove duplicates from dependencies while preserving order and types
+        const uniqueDeps: string[] = [];
+        const uniqueDepTypes = new Map<string, DependencyInfo>();
+        
+        for (const dep of blockInfo.dependencies) {
+            if (!uniqueDeps.includes(dep)) {
+                uniqueDeps.push(dep);
+                // Preserve the type information for unique dependencies
+                if (blockInfo.dependencyTypes?.has(dep)) {
+                    uniqueDepTypes.set(dep, blockInfo.dependencyTypes.get(dep)!);
+                }
+            }
+        }
+        
+        blockInfo.dependencies = uniqueDeps;
+        blockInfo.dependencyTypes = uniqueDepTypes;
 
         this.blocks.set(node, blockInfo);
         return blockInfo;
@@ -203,11 +228,19 @@ export class BlockAnalyzer {
      */
     private extractDependencies(expr: ts.Expression, deps: string[], depTypes?: Map<string, DependencyInfo>): void {
         if (ts.isIdentifier(expr)) {
-            deps.push(expr.text);
-            if (depTypes) {
+            // Only add if not already present
+            if (!deps.includes(expr.text)) {
+                deps.push(expr.text);
+            }
+            
+            if (depTypes && !depTypes.has(expr.text)) {
                 // Try to get the type of this identifier
                 const type = this.typeChecker.getTypeAtLocation(expr);
-                const typeNode = this.typeChecker.typeToTypeNode(type, expr, ts.NodeBuilderFlags.InTypeAlias);
+                const typeNode = this.typeChecker.typeToTypeNode(
+                    type, 
+                    expr, 
+                    ts.NodeBuilderFlags.InTypeAlias | ts.NodeBuilderFlags.UseAliasDefinedOutsideCurrentScope
+                );
                 depTypes.set(expr.text, {
                     name: expr.text,
                     type: typeNode,
@@ -310,10 +343,17 @@ export class BlockAnalyzer {
                     this.extractDependencies(prop.initializer, deps, depTypes);
                 } else if (ts.isShorthandPropertyAssignment(prop)) {
                     // For shorthand properties like { increment }, the identifier is the value
-                    deps.push(prop.name.text);
-                    if (depTypes) {
+                    if (!deps.includes(prop.name.text)) {
+                        deps.push(prop.name.text);
+                    }
+                    
+                    if (depTypes && !depTypes.has(prop.name.text)) {
                         const type = this.typeChecker.getTypeAtLocation(prop.name);
-                        const typeNode = this.typeChecker.typeToTypeNode(type, prop.name, ts.NodeBuilderFlags.InTypeAlias);
+                        const typeNode = this.typeChecker.typeToTypeNode(
+                            type, 
+                            prop.name, 
+                            ts.NodeBuilderFlags.InTypeAlias | ts.NodeBuilderFlags.UseAliasDefinedOutsideCurrentScope
+                        );
                         depTypes.set(prop.name.text, {
                             name: prop.name.text,
                             type: typeNode,

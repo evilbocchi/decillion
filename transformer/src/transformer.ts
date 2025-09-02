@@ -285,23 +285,63 @@ function generateMemoizedBlock(
     );
 
     const parameters = new Array<ts.ParameterDeclaration>();
+    
+    // Create a map to track which dependencies we've already processed
+    const processedDependencies = new Set<string>();
+    
     for (const dep of blockInfo.dependencies) {
+        // Skip if we've already processed this dependency (avoid duplicates)
+        if (processedDependencies.has(dep)) {
+            continue;
+        }
+        processedDependencies.add(dep);
+        
         let typeNode: ts.TypeNode | undefined;
 
-        // Try to get type information from the dependency types map
+        // Try to get type information from the dependency types map first
         if (blockInfo.dependencyTypes?.has(dep)) {
             const depInfo = blockInfo.dependencyTypes.get(dep)!;
             typeNode = depInfo.type;
+            
+            // If we have a source node, try to get the type from there for better accuracy
+            if (!typeNode && depInfo.sourceNode && context.typeChecker) {
+                const type = context.typeChecker.getTypeAtLocation(depInfo.sourceNode);
+                typeNode = context.typeChecker.typeToTypeNode(
+                    type, 
+                    depInfo.sourceNode, 
+                    ts.NodeBuilderFlags.InTypeAlias | ts.NodeBuilderFlags.UseAliasDefinedOutsideCurrentScope
+                );
+            }
         }
 
-        // If we couldn't get a specific type, try to infer it from context
+        // If we still don't have a type, try to find it in the current scope context
         if (!typeNode && context.typeChecker) {
-            // Try to find the identifier in the current scope and get its type
-            // This is a fallback for when the dependency analysis didn't capture the type
-            const symbol = context.typeChecker.getSymbolAtLocation(ts.factory.createIdentifier(dep));
-            if (symbol) {
-                const type = context.typeChecker.getTypeOfSymbolAtLocation(symbol, node);
-                typeNode = context.typeChecker.typeToTypeNode(type, node, ts.NodeBuilderFlags.InTypeAlias);
+            // Create a temporary identifier to look up the symbol
+            const tempIdentifier = ts.factory.createIdentifier(dep);
+            
+            // Try to find the symbol at the node's location for better context
+            let searchContext: ts.Node = node;
+            
+            // Walk up the tree to find a better context for symbol lookup
+            while (searchContext.parent && !ts.isSourceFile(searchContext.parent)) {
+                searchContext = searchContext.parent;
+                
+                // If we find a function declaration/expression, use that as context
+                if (ts.isFunctionDeclaration(searchContext) || 
+                    ts.isFunctionExpression(searchContext) || 
+                    ts.isArrowFunction(searchContext)) {
+                    break;
+                }
+            }
+            
+            const symbol = context.typeChecker.getSymbolAtLocation(tempIdentifier);
+            if (symbol && symbol.valueDeclaration) {
+                const type = context.typeChecker.getTypeOfSymbolAtLocation(symbol, symbol.valueDeclaration);
+                typeNode = context.typeChecker.typeToTypeNode(
+                    type, 
+                    symbol.valueDeclaration, 
+                    ts.NodeBuilderFlags.InTypeAlias | ts.NodeBuilderFlags.UseAliasDefinedOutsideCurrentScope
+                );
             }
         }
 
@@ -324,8 +364,11 @@ function generateMemoizedBlock(
         createElementCall
     );
 
+    // Use the deduplicated dependencies for the dependencies array
+    const finalDependencies = Array.from(processedDependencies);
+
     return {
-        element: createMemoizedBlockCall(arrowFunction, blockInfo.dependencies, blockId),
+        element: createMemoizedBlockCall(arrowFunction, finalDependencies, blockId),
         needsRuntimeImport: true
     };
 }
