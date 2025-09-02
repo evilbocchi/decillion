@@ -353,6 +353,14 @@ class RobloxStaticDetector {
                 }
                 this.staticProperties.get(typeName)!.add(memberName);
             }
+
+            // Handle constructor signatures as 'new' method
+            if (ts.isConstructSignatureDeclaration(member)) {
+                if (!this.staticMethods.has(typeName)) {
+                    this.staticMethods.set(typeName, new Set());
+                }
+                this.staticMethods.get(typeName)!.add("new");
+            }
         }
 
         // Mark as having constructor if it's a known constructible type
@@ -419,6 +427,14 @@ class RobloxStaticDetector {
                     }
                     this.staticProperties.get(typeName)!.add(memberName);
                 }
+            }
+
+            // Handle constructor signatures as 'new' method
+            if (ts.isConstructSignatureDeclaration(member)) {
+                if (!this.staticMethods.has(typeName)) {
+                    this.staticMethods.set(typeName, new Set());
+                }
+                this.staticMethods.get(typeName)!.add("new");
             }
         }
     }
