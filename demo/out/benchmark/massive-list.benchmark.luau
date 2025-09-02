@@ -50,7 +50,7 @@ local function OptimizedListItem(_param)
 				TextColor3 = Color3.fromRGB(255, 255, 255),
 				BackgroundTransparency = 1,
 			})
-		end, { name, value }, "dynamic_textlabel_tdnqpd3r4"), useMemoizedBlock(function(id)
+		end, { name, value }, "dynamic_textlabel_cfzh1mz2q"), useMemoizedBlock(function(id)
 			return React.createElement("textlabel", {
 				Text = `#{id}`,
 				Size = UDim2.new(0.2, 0, 1, 0),
@@ -58,8 +58,8 @@ local function OptimizedListItem(_param)
 				TextColor3 = Color3.fromRGB(200, 200, 200),
 				BackgroundTransparency = 1,
 			})
-		end, { id }, "dynamic_textlabel_cy0wn2cqx"))
-	end, { isActive, name, value, id }, "dynamic_frame_qp64dhmv6")
+		end, { id }, "dynamic_textlabel_tti7k7tdw"))
+	end, { isActive, name, value, id }, "dynamic_frame_hhhpxste7")
 end
 local function MassiveListBenchmark()
 	local itemCount, setItemCount = useState(100)
@@ -114,7 +114,7 @@ local function MassiveListBenchmark()
 					TextColor3 = Color3.fromRGB(255, 255, 255),
 					BackgroundTransparency = 1,
 				})
-			end, { itemCount }, "dynamic_textlabel_1afdd3a6o"), useMemoizedBlock(function(useOptimized)
+			end, { itemCount }, "dynamic_textlabel_mpygtkckg"), useMemoizedBlock(function(useOptimized)
 				return React.createElement("textbutton", {
 					Text = if useOptimized then "Using Optimized" else "Using Traditional",
 					Size = UDim2.new(0.3, 0, 0, 30),
@@ -127,7 +127,7 @@ local function MassiveListBenchmark()
 						end,
 					},
 				})
-			end, { useOptimized }, "dynamic_textbutton_urqccapfo"), useMemoizedBlock(function(triggerUpdate)
+			end, { useOptimized }, "dynamic_textbutton_u94o2gt8g"), useMemoizedBlock(function(triggerUpdate)
 				return React.createElement("textbutton", {
 					Text = "Trigger Re-render",
 					Size = UDim2.new(0.3, 0, 0, 30),
@@ -138,7 +138,7 @@ local function MassiveListBenchmark()
 						MouseButton1Click = triggerUpdate,
 					},
 				})
-			end, { triggerUpdate }, "dynamic_textbutton_0s0kbh7ep"), useMemoizedBlock(function(renderTime)
+			end, { triggerUpdate }, "dynamic_textbutton_sdsv59jlr"), useMemoizedBlock(function(renderTime)
 				return React.createElement("textlabel", {
 					Text = `Last Render: {string.format("%.3f", renderTime)}ms`,
 					Size = UDim2.new(0.3, 0, 0, 30),
@@ -146,7 +146,7 @@ local function MassiveListBenchmark()
 					TextColor3 = Color3.fromRGB(200, 200, 200),
 					BackgroundTransparency = 1,
 				})
-			end, { renderTime }, "dynamic_textlabel_vicvde8z5"), useMemoizedBlock(function(itemCount)
+			end, { renderTime }, "dynamic_textlabel_6094y0xxt"), useMemoizedBlock(function(itemCount)
 				return React.createElement("textlabel", {
 					Text = `Items: {itemCount}`,
 					Size = UDim2.new(0.5, 0, 0, 30),
@@ -154,8 +154,8 @@ local function MassiveListBenchmark()
 					TextColor3 = Color3.fromRGB(200, 200, 200),
 					BackgroundTransparency = 1,
 				})
-			end, { itemCount }, "dynamic_textlabel_d83uhh52h"))
-		end, { itemCount, useOptimized, triggerUpdate, renderTime }, "dynamic_frame_dv7qolkjw"), useMemoizedBlock(function(itemCount, items, ListComponent)
+			end, { itemCount }, "dynamic_textlabel_vps1z1nhv"))
+		end, { itemCount, useOptimized, triggerUpdate, renderTime }, "dynamic_frame_8q93ghayk"), useMemoizedBlock(function(itemCount, items, ListComponent)
 			local _exp = {
 				Size = UDim2.new(1, 0, 1, -100),
 				Position = UDim2.new(0, 0, 0, 100),
@@ -183,8 +183,8 @@ local function MassiveListBenchmark()
 			end
 			-- ▲ ReadonlyArray.map ▲
 			return React.createElement("scrollingframe", _exp, _exp_1, _newValue)
-		end, { itemCount, items, ListComponent }, "dynamic_scrollingframe_vetyg1a8u"))
-	end, { itemCount, useOptimized, triggerUpdate, renderTime, items, ListComponent }, "dynamic_frame_x592w38n0")
+		end, { itemCount, items, ListComponent }, "dynamic_scrollingframe_gaxzaouc3"))
+	end, { itemCount, useOptimized, triggerUpdate, renderTime, items, ListComponent }, "dynamic_frame_fd5ojj09v")
 end
 -- Alternative ways to use @undecillion
 -- Comment-style for arrow functions
@@ -198,7 +198,7 @@ local SkippedArrowComponent = function(_param)
 			BackgroundTransparency = 1,
 			TextColor3 = Color3.fromRGB(255, 255, 255),
 		})
-	end, { text }, "dynamic_textlabel_phd7zdlbz")
+	end, { text }, "dynamic_textlabel_ez9gumbwo")
 end
 -- JSDoc-style documentation
 --[[

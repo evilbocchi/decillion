@@ -575,13 +575,9 @@ export function hasUndecillionDecorator(
     node: ts.FunctionDeclaration | ts.FunctionExpression | ts.ArrowFunction | ts.MethodDeclaration,
     sourceFile?: ts.SourceFile,
 ): boolean {
-    const functionName = getFunctionName(node);
-    const debug = true; // Enable debug for this function
-    
     // Get the source file and text
     const file = sourceFile || node.getSourceFile();
     if (!file) {
-        if (debug) console.log(`hasUndecillionDecorator(${functionName}): No source file`);
         return false;
     }
 
@@ -617,10 +613,6 @@ export function hasUndecillionDecorator(
     // Check if @undecillion appears in comments before the function
     const hasUndecillionMarker = contextText.includes("@undecillion") || textBeforeNode.includes("@undecillion");
 
-    if (debug && hasUndecillionMarker) {
-        console.log(`hasUndecillionDecorator(${functionName}): Found @undecillion marker in text`);
-    }
-
     if (hasUndecillionMarker) {
         // Ensure it's in a comment context, not just random text
         const lines = contextText.split("\n");
@@ -630,10 +622,6 @@ export function hasUndecillionDecorator(
 
             // Check if this line contains @undecillion in a comment context
             if (line.includes("@undecillion")) {
-                if (debug) {
-                    console.log(`hasUndecillionDecorator(${functionName}): Checking line: "${line}"`);
-                }
-                
                 // Verify it's in a comment (starts with //, /*, or is part of JSDoc)
                 if (
                     line.startsWith("//") ||
@@ -642,9 +630,6 @@ export function hasUndecillionDecorator(
                     line.includes("* @undecillion") ||
                     line.match(/^\s*@undecillion/)
                 ) {
-                    if (debug) {
-                        console.log(`hasUndecillionDecorator(${functionName}): Found valid @undecillion comment`);
-                    }
                     return true;
                 }
             }
@@ -661,12 +646,6 @@ export function hasUndecillionDecorator(
                 break;
             }
         }
-    }
-
-    if (debug && hasUndecillionMarker) {
-        console.log(
-            `hasUndecillionDecorator(${functionName}): Found @undecillion marker but not in valid comment context`,
-        );
     }
 
     return false;

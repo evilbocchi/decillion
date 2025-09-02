@@ -168,4 +168,27 @@ const TestComponent = () => {
         expect(functionNode).toBeTruthy();
         expect(getFunctionName(functionNode!)).toBe("TestComponent");
     });
+
+    it("should detect @undecillion with exact demo format - SkippedArrowComponent", () => {
+        const code = `
+// Comment-style for arrow functions
+// @undecillion - Skip transformation for this component
+const SkippedArrowComponent = ({ text }: { text: string }) => {
+    return (
+        <textlabel
+            Text={text}
+            Size={new UDim2(1, 0, 0, 30)}
+            BackgroundTransparency={1}
+            TextColor3={Color3.fromRGB(255, 255, 255)}
+        />
+    );
+};`;
+
+        const sourceFile = createSourceFile(code);
+        const functionNode = findFunctionInFile(sourceFile);
+
+        expect(functionNode).toBeTruthy();
+        expect(getFunctionName(functionNode!)).toBe("SkippedArrowComponent");
+        expect(hasUndecillionDecorator(functionNode!, sourceFile)).toBe(true);
+    });
 });
