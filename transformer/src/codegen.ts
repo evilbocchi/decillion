@@ -112,8 +112,9 @@ export function createMemoizedBlockCall(
 export function createParametersWithTypes(dependencies: string[]): ts.ParameterDeclaration[] {
     return dependencies.map(dep => {
         let typeNode: ts.TypeNode | undefined;
+        const lowerDep = dep.toLowerCase();
 
-        // Common Roblox types we can infer
+        // Exact Roblox type matches (highest priority)
         if (dep === 'Color3') {
             typeNode = ts.factory.createTypeReferenceNode(
                 ts.factory.createIdentifier('Color3Constructor'),
@@ -129,21 +130,142 @@ export function createParametersWithTypes(dependencies: string[]): ts.ParameterD
                 ts.factory.createIdentifier(dep + 'Constructor'),
                 undefined
             );
-        } else if (dep.includes('count') || dep.includes('number') || dep.includes('size') || dep.includes('position')) {
-            typeNode = ts.factory.createKeywordTypeNode(ts.SyntaxKind.NumberKeyword);
-        } else if (dep.includes('text') || dep.includes('name') || dep.includes('title')) {
-            typeNode = ts.factory.createKeywordTypeNode(ts.SyntaxKind.StringKeyword);
-        } else if (dep.includes('visible') || dep.includes('enabled') || dep.includes('active')) {
+        } 
+        // Exact Roblox UI property matches
+        else if (dep === 'AnchorPoint' || dep === 'Position' || dep === 'Size') {
+            typeNode = ts.factory.createTypeReferenceNode(
+                ts.factory.createIdentifier('UDim2'),
+                undefined
+            );
+        } else if (dep === 'AbsolutePosition' || dep === 'AbsoluteSize' || dep === 'MousePosition') {
+            typeNode = ts.factory.createTypeReferenceNode(
+                ts.factory.createIdentifier('Vector2'),
+                undefined
+            );
+        } else if (dep === 'BackgroundColor3' || dep === 'TextColor3' || dep === 'BorderColor3') {
+            typeNode = ts.factory.createTypeReferenceNode(
+                ts.factory.createIdentifier('Color3'),
+                undefined
+            );
+        } else if (dep === 'TextScaled' || dep === 'AutoButtonColor' || dep === 'ClipsDescendants') {
             typeNode = ts.factory.createKeywordTypeNode(ts.SyntaxKind.BooleanKeyword);
-        } else if (dep.includes('ment') || dep.toLowerCase().includes('click') || dep.toLowerCase().includes('handler') || dep.endsWith('ment') || dep.includes('callback')) {
-            // Function dependencies (event handlers like increment, decrement)
+        }
+        // Roblox Instance types (check before string patterns to avoid conflicts with "label")
+        else if (/^(frame|textlabel|textbutton|textbox|imagelabel|imagebutton|scrollingframe|uipadding|uilayout|uigridlayout|uilistlayout)$/i.test(dep)) {
+            // Instance names should be Instance types
+            const instanceTypeName = dep.charAt(0).toUpperCase() + dep.slice(1);
+            typeNode = ts.factory.createTypeReferenceNode(
+                ts.factory.createIdentifier(instanceTypeName),
+                undefined
+            );
+        }
+        // Boolean patterns (check before string patterns to avoid conflicts with "selected", "focused", "update")
+        else if (dep.startsWith('is') || dep.startsWith('has') || dep.startsWith('can') || 
+                 dep.startsWith('should') || dep.startsWith('will') ||
+                 lowerDep.includes('visible') || lowerDep.includes('enabled') || lowerDep.includes('active') || 
+                 lowerDep.includes('disabled') || lowerDep.includes('selected') || lowerDep.includes('checked') || 
+                 lowerDep.includes('focused') || lowerDep.includes('hovered') || lowerDep.includes('loading') || 
+                 lowerDep.includes('open') || lowerDep.includes('closed')) {
+            typeNode = ts.factory.createKeywordTypeNode(ts.SyntaxKind.BooleanKeyword);
+        }
+        // Array/Collection patterns (check before other patterns to avoid conflicts)
+        else if (/^(items|children|elements|nodes|components)$/i.test(dep) || 
+                 lowerDep.includes('list') || lowerDep.includes('array') || 
+                 (dep.endsWith('s') && !lowerDep.includes('text') && !lowerDep.includes('name') && 
+                  !lowerDep.includes('class') && !lowerDep.includes('visible') && !lowerDep.includes('enabled') && 
+                  !lowerDep.includes('active') && !dep.startsWith('is') && !dep.startsWith('has'))) {
+            typeNode = ts.factory.createArrayTypeNode(
+                ts.factory.createKeywordTypeNode(ts.SyntaxKind.UnknownKeyword)
+            );
+        }
+        // React/Component patterns (before string patterns to avoid conflicts)
+        else if (/^(component|element|node|reactElement)$/i.test(dep)) {
+            typeNode = ts.factory.createTypeReferenceNode(
+                ts.factory.createIdentifier('ReactElement'),
+                undefined
+            );
+        } else if (lowerDep.includes('ref')) {
+            typeNode = ts.factory.createTypeReferenceNode(
+                ts.factory.createIdentifier('Ref'),
+                [ts.factory.createKeywordTypeNode(ts.SyntaxKind.UnknownKeyword)]
+            );
+        }
+        // Function patterns (check specific patterns first)
+        else if (lowerDep.includes('click') || lowerDep.includes('button') || lowerDep.includes('action')) {
+            // Mouse event handlers
+            typeNode = ts.factory.createFunctionTypeNode(
+                undefined,
+                [ts.factory.createParameterDeclaration(
+                    undefined,
+                    undefined,
+                    ts.factory.createIdentifier('event'),
+                    undefined,
+                    ts.factory.createTypeReferenceNode(
+                        ts.factory.createIdentifier('InputObject'),
+                        undefined
+                    ),
+                    undefined
+                )],
+                ts.factory.createKeywordTypeNode(ts.SyntaxKind.VoidKeyword)
+            );
+        } else if (lowerDep.includes('change') || lowerDep.includes('update') || lowerDep.includes('edit')) {
+            // Change event handlers
+            typeNode = ts.factory.createFunctionTypeNode(
+                undefined,
+                [ts.factory.createParameterDeclaration(
+                    undefined,
+                    undefined,
+                    ts.factory.createIdentifier('newValue'),
+                    undefined,
+                    ts.factory.createKeywordTypeNode(ts.SyntaxKind.UnknownKeyword),
+                    undefined
+                )],
+                ts.factory.createKeywordTypeNode(ts.SyntaxKind.VoidKeyword)
+            );
+        } else if (lowerDep.includes('ment') || lowerDep.includes('handler') || 
+                   dep.endsWith('ment') || lowerDep.includes('callback') || lowerDep.includes('listener') || 
+                   lowerDep.includes('event') || dep.startsWith('on') || dep.startsWith('handle') || 
+                   lowerDep.includes('trigger')) {
+            // Generic event handlers
             typeNode = ts.factory.createFunctionTypeNode(
                 undefined,
                 [],
                 ts.factory.createKeywordTypeNode(ts.SyntaxKind.VoidKeyword)
             );
-        } else {
-            typeNode = ts.factory.createKeywordTypeNode(ts.SyntaxKind.AnyKeyword);
+        }
+        // Roblox Enum patterns
+        else if (lowerDep.includes('enum') || /^(Font|TextXAlignment|TextYAlignment|SizeConstraint|AutomaticSize)$/i.test(dep)) {
+            typeNode = ts.factory.createTypeReferenceNode(
+                ts.factory.createIdentifier('Enum'),
+                undefined
+            );
+        }
+        // Number patterns
+        else if (lowerDep.includes('count') || lowerDep.includes('number') || lowerDep.includes('size') || lowerDep.includes('position') ||
+                 lowerDep.includes('width') || lowerDep.includes('height') || lowerDep.includes('offset') || lowerDep.includes('scale') ||
+                 lowerDep.includes('rotation') || lowerDep.includes('transparency') || lowerDep.includes('index') || lowerDep.includes('length')) {
+            typeNode = ts.factory.createKeywordTypeNode(ts.SyntaxKind.NumberKeyword);
+        }
+        // String patterns
+        else if (lowerDep.includes('text') || lowerDep.includes('name') || lowerDep.includes('title') || lowerDep.includes('label') ||
+                 lowerDep.includes('content') || lowerDep.includes('message') || lowerDep.includes('description') || lowerDep.includes('placeholder') ||
+                 lowerDep.includes('id') || lowerDep.includes('key') || lowerDep.includes('tag') || lowerDep.includes('font')) {
+            typeNode = ts.factory.createKeywordTypeNode(ts.SyntaxKind.StringKeyword);
+        }
+        // State patterns (only match specific state-like patterns, not arbitrary "data")
+        else if (lowerDep.includes('state') || lowerDep === 'data' || lowerDep.includes('model') || lowerDep.includes('store') || 
+                 lowerDep.includes('appdata') || lowerDep.includes('userdata') || lowerDep.includes('gamedata')) {
+            typeNode = ts.factory.createTypeReferenceNode(
+                ts.factory.createIdentifier('Record'),
+                [
+                    ts.factory.createKeywordTypeNode(ts.SyntaxKind.StringKeyword),
+                    ts.factory.createKeywordTypeNode(ts.SyntaxKind.UnknownKeyword)
+                ]
+            );
+        }
+        // Default to unknown instead of any for better type safety
+        else {
+            typeNode = ts.factory.createKeywordTypeNode(ts.SyntaxKind.UnknownKeyword);
         }
 
         return ts.factory.createParameterDeclaration(

@@ -252,18 +252,148 @@ describe('Code Generation', () => {
             });
         });
 
-        it('should default to any for unknown patterns', () => {
+        it('should default to unknown for unknown patterns', () => {
             const dependencies = ['unknownVar', 'mysteriousData'];
             const result = createParametersWithTypes(dependencies);
 
             result.forEach(param => {
-                expect(param.type?.kind).toBe(ts.SyntaxKind.AnyKeyword);
+                expect(param.type?.kind).toBe(ts.SyntaxKind.UnknownKeyword);
             });
         });
 
         it('should handle empty dependencies', () => {
             const result = createParametersWithTypes([]);
             expect(result).toHaveLength(0);
+        });
+
+        it('should infer Roblox UI property types', () => {
+            const dependencies = ['AnchorPoint', 'Position', 'Size'];
+            const result = createParametersWithTypes(dependencies);
+
+            result.forEach(param => {
+                expect(ts.isTypeReferenceNode(param.type!)).toBe(true);
+                const typeRef = param.type as ts.TypeReferenceNode;
+                expect(ts.isIdentifier(typeRef.typeName) && typeRef.typeName.text).toBe('UDim2');
+            });
+        });
+
+        it('should infer Roblox Color3 property types', () => {
+            const dependencies = ['BackgroundColor3', 'TextColor3', 'BorderColor3'];
+            const result = createParametersWithTypes(dependencies);
+
+            result.forEach(param => {
+                expect(ts.isTypeReferenceNode(param.type!)).toBe(true);
+                const typeRef = param.type as ts.TypeReferenceNode;
+                expect(ts.isIdentifier(typeRef.typeName) && typeRef.typeName.text).toBe('Color3');
+            });
+        });
+
+        it('should infer Vector2 property types', () => {
+            const dependencies = ['AbsolutePosition', 'AbsoluteSize', 'MousePosition'];
+            const result = createParametersWithTypes(dependencies);
+
+            result.forEach(param => {
+                expect(ts.isTypeReferenceNode(param.type!)).toBe(true);
+                const typeRef = param.type as ts.TypeReferenceNode;
+                expect(ts.isIdentifier(typeRef.typeName) && typeRef.typeName.text).toBe('Vector2');
+            });
+        });
+
+        it('should infer Roblox Instance types', () => {
+            const dependencies = ['frame', 'textlabel', 'textbutton', 'ImageLabel'];
+            const result = createParametersWithTypes(dependencies);
+
+            expect(result[0].type).toBeDefined();
+            expect(result[1].type).toBeDefined();
+            expect(result[2].type).toBeDefined();
+            expect(result[3].type).toBeDefined();
+
+            // Check that they're type references (Instance types)
+            result.forEach(param => {
+                expect(ts.isTypeReferenceNode(param.type!)).toBe(true);
+            });
+        });
+
+        it('should infer array types for collection patterns', () => {
+            const dependencies = ['items', 'children', 'list', 'dataArray'];
+            const result = createParametersWithTypes(dependencies);
+
+            result.forEach(param => {
+                expect(ts.isArrayTypeNode(param.type!)).toBe(true);
+            });
+        });
+
+        it('should infer expanded number types', () => {
+            const dependencies = ['width', 'height', 'offset', 'scale', 'rotation', 'transparency', 'index'];
+            const result = createParametersWithTypes(dependencies);
+
+            result.forEach(param => {
+                expect(param.type?.kind).toBe(ts.SyntaxKind.NumberKeyword);
+            });
+        });
+
+        it('should infer expanded string types', () => {
+            const dependencies = ['label', 'content', 'message', 'description', 'placeholder', 'fontName'];
+            const result = createParametersWithTypes(dependencies);
+
+            result.forEach(param => {
+                expect(param.type?.kind).toBe(ts.SyntaxKind.StringKeyword);
+            });
+        });
+
+        it('should infer expanded boolean types', () => {
+            const dependencies = ['isOpen', 'hasItems', 'canEdit', 'shouldShow', 'willUpdate', 'selected', 'focused'];
+            const result = createParametersWithTypes(dependencies);
+
+            result.forEach(param => {
+                expect(param.type?.kind).toBe(ts.SyntaxKind.BooleanKeyword);
+            });
+        });
+
+        it('should infer specific function types for mouse events', () => {
+            const dependencies = ['onClick', 'onButtonClick', 'handleAction'];
+            const result = createParametersWithTypes(dependencies);
+
+            result.forEach(param => {
+                expect(ts.isFunctionTypeNode(param.type!)).toBe(true);
+                const funcType = param.type as ts.FunctionTypeNode;
+                // Should have one parameter for InputObject
+                expect(funcType.parameters).toHaveLength(1);
+            });
+        });
+
+        it('should infer specific function types for change events', () => {
+            const dependencies = ['onChange', 'onUpdate', 'handleEdit'];
+            const result = createParametersWithTypes(dependencies);
+
+            result.forEach(param => {
+                expect(ts.isFunctionTypeNode(param.type!)).toBe(true);
+                const funcType = param.type as ts.FunctionTypeNode;
+                // Should have one parameter for newValue
+                expect(funcType.parameters).toHaveLength(1);
+            });
+        });
+
+        it('should infer state/data types as Record', () => {
+            const dependencies = ['state', 'data', 'model', 'store'];
+            const result = createParametersWithTypes(dependencies);
+
+            result.forEach(param => {
+                expect(ts.isTypeReferenceNode(param.type!)).toBe(true);
+                const typeRef = param.type as ts.TypeReferenceNode;
+                expect(ts.isIdentifier(typeRef.typeName) && typeRef.typeName.text).toBe('Record');
+            });
+        });
+
+        it('should infer React component types', () => {
+            const dependencies = ['component', 'element', 'node'];
+            const result = createParametersWithTypes(dependencies);
+
+            result.forEach(param => {
+                expect(ts.isTypeReferenceNode(param.type!)).toBe(true);
+                const typeRef = param.type as ts.TypeReferenceNode;
+                expect(ts.isIdentifier(typeRef.typeName) && typeRef.typeName.text).toBe('ReactElement');
+            });
         });
     });
 
