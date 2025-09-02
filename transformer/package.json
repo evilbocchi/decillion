@@ -2,10 +2,12 @@
     "name": "rbxts-transformer-decillion",
     "version": "0.0.0",
     "description": "A Million.js-inspired high-performance UI renderer for Roblox-TS",
+    "type": "commonjs",
     "main": "out/index.js",
     "scripts": {
         "build": "tsc",
         "dev": "tsc --watch",
+        "lint": "eslint src",
         "test": "vitest --run --coverage"
     },
     "license": "MIT",
@@ -27,6 +29,7 @@
         "eslint": "^8.57.0",
         "eslint-config-prettier": "^9.1.0",
         "eslint-plugin-prettier": "^5.2.1",
+        "typescript-eslint": "^8.42.0",
         "vitest": "^3.2.4"
     },
     "files": [

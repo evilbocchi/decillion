@@ -10,11 +10,8 @@ import type { PropInfo } from "./types";
  * Creates a props object from prop array
  */
 export function createPropsObject(props: PropInfo[]): ts.ObjectLiteralExpression {
-    const properties = props.map(prop =>
-        ts.factory.createPropertyAssignment(
-            ts.factory.createIdentifier(prop.name),
-            prop.value
-        )
+    const properties = props.map((prop) =>
+        ts.factory.createPropertyAssignment(ts.factory.createIdentifier(prop.name), prop.value),
     );
 
     return ts.factory.createObjectLiteralExpression(properties, true);
@@ -24,9 +21,7 @@ export function createPropsObject(props: PropInfo[]): ts.ObjectLiteralExpression
  * Creates dependencies array for memoization
  */
 export function createDependenciesArray(dependencies: string[]): ts.ArrayLiteralExpression {
-    const elements = dependencies.map(dep =>
-        ts.factory.createIdentifier(dep)
-    );
+    const elements = dependencies.map((dep) => ts.factory.createIdentifier(dep));
 
     return ts.factory.createArrayLiteralExpression(elements, false);
 }
@@ -74,17 +69,13 @@ function createTagReference(tagName: string): ts.Expression {
 export function createStaticElementCall(
     tagName: string,
     propsArg: ts.Expression,
-    children: ts.Expression[] = []
+    children: ts.Expression[] = [],
 ): ts.CallExpression {
-    return ts.factory.createCallExpression(
-        ts.factory.createIdentifier("createStaticElement"),
-        undefined,
-        [
-            createTagReference(tagName),
-            propsArg,
-            ...children
-        ]
-    );
+    return ts.factory.createCallExpression(ts.factory.createIdentifier("createStaticElement"), undefined, [
+        createTagReference(tagName),
+        propsArg,
+        ...children,
+    ]);
 }
 
 /**
@@ -93,15 +84,11 @@ export function createStaticElementCall(
 export function createMemoizedBlockCall(
     blockFunction: ts.ArrowFunction,
     dependencies: string[],
-    blockId: string
+    blockId: string,
 ): ts.CallExpression {
-    return ts.factory.createCallExpression(
-        ts.factory.createIdentifier("useMemoizedBlock"),
-        undefined,
-        [
-            blockFunction,
-            createDependenciesArray(dependencies),
-            ts.factory.createStringLiteral(blockId)
-        ]
-    );
+    return ts.factory.createCallExpression(ts.factory.createIdentifier("useMemoizedBlock"), undefined, [
+        blockFunction,
+        createDependenciesArray(dependencies),
+        ts.factory.createStringLiteral(blockId),
+    ]);
 }

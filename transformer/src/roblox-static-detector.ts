@@ -48,19 +48,18 @@ class RobloxStaticDetector {
         }
 
         if (debug) {
-            console.log('Skipping cache due to debug mode, parsing roblox.d.ts...');
+            console.log("Skipping cache due to debug mode, parsing roblox.d.ts...");
         }
 
         const resolved = this.resolveRobloxDTs(program);
         if (!resolved) {
-            throw new Error('Could not resolve @rbxts/types');
+            throw new Error("Could not resolve @rbxts/types");
         }
 
         const robloxDTs = this.createSourceFileFromPath(resolved.resolvedFileName);
         if (!robloxDTs) {
-            throw new Error('Could not create source file for roblox.d.ts');
+            throw new Error("Could not create source file for roblox.d.ts");
         }
-
 
         // Parse the main roblox.d.ts file
         this.parseRbxtsDts(robloxDTs);
@@ -72,7 +71,7 @@ class RobloxStaticDetector {
         if (!debug) {
             this.saveToCache();
         } else if (debug) {
-            console.log('RobloxStaticDetector: Skipping cache save due to debug mode');
+            console.log("RobloxStaticDetector: Skipping cache save due to debug mode");
         }
 
         this.initialized = true;
@@ -81,12 +80,12 @@ class RobloxStaticDetector {
     private resolveRobloxDTs(program: ts.Program): ts.ResolvedModuleFull | undefined {
         // First try the standard TypeScript module resolution
         const standardResolve = ts.resolveModuleName(
-            '@rbxts/types',
+            "@rbxts/types",
             program.getCurrentDirectory(),
             program.getCompilerOptions(),
-            ts.sys
+            ts.sys,
         ).resolvedModule;
-        
+
         if (standardResolve) {
             return standardResolve;
         }
@@ -94,12 +93,12 @@ class RobloxStaticDetector {
         // Fallback: Try to find @rbxts/types manually
         const currentDir = program.getCurrentDirectory();
         const possiblePaths = [
-            path.join(currentDir, 'node_modules', '@rbxts', 'types', 'include', 'roblox.d.ts'),
-            path.join(currentDir, '..', 'node_modules', '@rbxts', 'types', 'include', 'roblox.d.ts'),
-            path.join(currentDir, 'node_modules', '@rbxts', 'types', 'index.d.ts'),
-            path.join(currentDir, '..', 'node_modules', '@rbxts', 'types', 'index.d.ts'),
-            path.join(currentDir, 'node_modules', '@rbxts', 'types', 'types.d.ts'),
-            path.join(currentDir, '..', 'node_modules', '@rbxts', 'types', 'types.d.ts'),
+            path.join(currentDir, "node_modules", "@rbxts", "types", "include", "roblox.d.ts"),
+            path.join(currentDir, "..", "node_modules", "@rbxts", "types", "include", "roblox.d.ts"),
+            path.join(currentDir, "node_modules", "@rbxts", "types", "index.d.ts"),
+            path.join(currentDir, "..", "node_modules", "@rbxts", "types", "index.d.ts"),
+            path.join(currentDir, "node_modules", "@rbxts", "types", "types.d.ts"),
+            path.join(currentDir, "..", "node_modules", "@rbxts", "types", "types.d.ts"),
         ];
 
         for (const possiblePath of possiblePaths) {
@@ -107,15 +106,15 @@ class RobloxStaticDetector {
                 return {
                     resolvedFileName: possiblePath,
                     isExternalLibraryImport: true,
-                    extension: ts.Extension.Dts
+                    extension: ts.Extension.Dts,
                 };
             }
         }
 
         // If we still can't find it, try to find the main roblox.d.ts file
         const robloxDtsPaths = [
-            path.join(currentDir, 'node_modules', '@rbxts', 'types', 'roblox.d.ts'),
-            path.join(currentDir, '..', 'node_modules', '@rbxts', 'types', 'roblox.d.ts'),
+            path.join(currentDir, "node_modules", "@rbxts", "types", "roblox.d.ts"),
+            path.join(currentDir, "..", "node_modules", "@rbxts", "types", "roblox.d.ts"),
         ];
 
         for (const robloxDtsPath of robloxDtsPaths) {
@@ -123,7 +122,7 @@ class RobloxStaticDetector {
                 return {
                     resolvedFileName: robloxDtsPath,
                     isExternalLibraryImport: true,
-                    extension: ts.Extension.Dts
+                    extension: ts.Extension.Dts,
                 };
             }
         }
@@ -143,16 +142,15 @@ class RobloxStaticDetector {
                 return undefined;
             }
 
-            const packageJsonContent = fs.readFileSync(packageJsonPath, 'utf-8');
+            const packageJsonContent = fs.readFileSync(packageJsonPath, "utf-8");
             const packageJson = JSON.parse(packageJsonContent);
 
             // Check both dependencies and devDependencies
-            const version = packageJson.dependencies?.['@rbxts/types'] ||
-                packageJson.devDependencies?.['@rbxts/types'];
+            const version = packageJson.dependencies?.["@rbxts/types"] || packageJson.devDependencies?.["@rbxts/types"];
 
             return version;
         } catch (error) {
-            console.warn('Failed to read @rbxts/types version:', error);
+            console.warn("Failed to read @rbxts/types version:", error);
             return undefined;
         }
     }
@@ -164,7 +162,7 @@ class RobloxStaticDetector {
         let currentDir = dir;
 
         while (currentDir !== path.dirname(currentDir)) {
-            const packageJsonPath = path.join(currentDir, 'package.json');
+            const packageJsonPath = path.join(currentDir, "package.json");
             if (fs.existsSync(packageJsonPath)) {
                 return packageJsonPath;
             }
@@ -179,14 +177,14 @@ class RobloxStaticDetector {
      */
     private getCacheFilePath(program: ts.Program): string {
         const currentDir = program.getCurrentDirectory();
-        const cacheDir = path.join(currentDir, 'node_modules', '.cache', 'decillion');
+        const cacheDir = path.join(currentDir, "node_modules", ".cache", "decillion");
 
         // Ensure cache directory exists
         if (!fs.existsSync(cacheDir)) {
             fs.mkdirSync(cacheDir, { recursive: true });
         }
 
-        return path.join(cacheDir, 'roblox-static-cache.json');
+        return path.join(cacheDir, "roblox-static-cache.json");
     }
 
     /**
@@ -202,7 +200,7 @@ class RobloxStaticDetector {
                 return false;
             }
 
-            const cacheContent = fs.readFileSync(this.cacheFilePath, 'utf-8');
+            const cacheContent = fs.readFileSync(this.cacheFilePath, "utf-8");
             const cacheData: CacheData = JSON.parse(cacheContent);
 
             // Check if version matches
@@ -225,7 +223,7 @@ class RobloxStaticDetector {
 
             return true;
         } catch (error) {
-            console.warn('Failed to load cache:', error);
+            console.warn("Failed to load cache:", error);
             return false;
         }
     }
@@ -243,16 +241,16 @@ class RobloxStaticDetector {
                 version: this.currentRbxtsVersion,
                 staticConstructors: Array.from(this.staticConstructors),
                 staticMethods: Object.fromEntries(
-                    Array.from(this.staticMethods.entries()).map(([key, values]) => [key, Array.from(values)])
+                    Array.from(this.staticMethods.entries()).map(([key, values]) => [key, Array.from(values)]),
                 ),
                 staticProperties: Object.fromEntries(
-                    Array.from(this.staticProperties.entries()).map(([key, values]) => [key, Array.from(values)])
-                )
+                    Array.from(this.staticProperties.entries()).map(([key, values]) => [key, Array.from(values)]),
+                ),
             };
 
-            fs.writeFileSync(this.cacheFilePath, JSON.stringify(cacheData, null, 2), 'utf-8');
+            fs.writeFileSync(this.cacheFilePath, JSON.stringify(cacheData, null, 2), "utf-8");
         } catch (error) {
-            console.warn('Failed to save cache:', error);
+            console.warn("Failed to save cache:", error);
         }
     }
 
@@ -271,9 +269,9 @@ class RobloxStaticDetector {
         if (clearCache && this.cacheFilePath && fs.existsSync(this.cacheFilePath)) {
             try {
                 fs.unlinkSync(this.cacheFilePath);
-                console.log('RobloxStaticDetector: Cache file cleared');
+                console.log("RobloxStaticDetector: Cache file cleared");
             } catch (error) {
-                console.warn('Failed to clear cache file:', error);
+                console.warn("Failed to clear cache file:", error);
             }
         }
     }
@@ -338,12 +336,12 @@ class RobloxStaticDetector {
                 return undefined;
             }
 
-            const fileContent = fs.readFileSync(filePath, 'utf-8');
+            const fileContent = fs.readFileSync(filePath, "utf-8");
             return ts.createSourceFile(
                 filePath,
                 fileContent,
                 ts.ScriptTarget.Latest,
-                true // setParentNodes
+                true, // setParentNodes
             );
         } catch (error) {
             console.warn(`Failed to read ${filePath}:`, error);
@@ -366,7 +364,7 @@ class RobloxStaticDetector {
                 if (!typeName) return;
 
                 // Skip constructor interfaces - they'll be handled via declare const statements
-                if (typeName.endsWith('Constructor')) {
+                if (typeName.endsWith("Constructor")) {
                     return;
                 }
 
@@ -381,7 +379,7 @@ class RobloxStaticDetector {
             // Look for namespace declarations (like Enum)
             if (ts.isModuleDeclaration(node) && node.name && ts.isIdentifier(node.name)) {
                 const namespaceName = node.name.text;
-                if (namespaceName === 'Enum' && node.body && ts.isModuleBlock(node.body)) {
+                if (namespaceName === "Enum" && node.body && ts.isModuleBlock(node.body)) {
                     this.parseEnumNamespace(node.body);
                 } else if (node.body && ts.isModuleBlock(node.body)) {
                     // Handle other namespaces like string, math, etc.
@@ -467,7 +465,7 @@ class RobloxStaticDetector {
                 const constructorInterfaceName = typeRef.typeName.text;
 
                 // Check if this is a constructor interface pattern (e.g., Color3Constructor)
-                if (constructorInterfaceName.endsWith('Constructor')) {
+                if (constructorInterfaceName.endsWith("Constructor")) {
                     // Find the constructor interface declaration
                     this.parseConstructorInterface(varName, constructorInterfaceName);
                 }
@@ -495,7 +493,10 @@ class RobloxStaticDetector {
                 if (!memberName) continue;
 
                 // Constructor interface members become static methods/properties
-                if (ts.isMethodSignature(member) || (ts.isPropertySignature(member) && member.type && ts.isFunctionTypeNode(member.type))) {
+                if (
+                    ts.isMethodSignature(member) ||
+                    (ts.isPropertySignature(member) && member.type && ts.isFunctionTypeNode(member.type))
+                ) {
                     // It's a method (either method signature or property with function type)
                     if (!this.staticMethods.has(typeName)) {
                         this.staticMethods.set(typeName, new Set());
@@ -528,10 +529,10 @@ class RobloxStaticDetector {
             if (ts.isModuleDeclaration(statement) && statement.name && ts.isIdentifier(statement.name)) {
                 const enumName = statement.name.text;
                 // Enum values are essentially static properties
-                if (!this.staticProperties.has('Enum')) {
-                    this.staticProperties.set('Enum', new Set());
+                if (!this.staticProperties.has("Enum")) {
+                    this.staticProperties.set("Enum", new Set());
                 }
-                this.staticProperties.get('Enum')!.add(enumName);
+                this.staticProperties.get("Enum")!.add(enumName);
             }
         }
     }
@@ -549,11 +550,15 @@ class RobloxStaticDetector {
                 }
                 this.staticMethods.get(namespaceName)!.add(functionName);
             }
-            
+
             // Handle variable declarations that might be static properties
             if (ts.isVariableStatement(statement)) {
                 for (const declaration of statement.declarationList.declarations) {
-                    if (ts.isVariableDeclaration(declaration) && declaration.name && ts.isIdentifier(declaration.name)) {
+                    if (
+                        ts.isVariableDeclaration(declaration) &&
+                        declaration.name &&
+                        ts.isIdentifier(declaration.name)
+                    ) {
                         const propertyName = declaration.name.text;
                         if (!this.staticProperties.has(namespaceName)) {
                             this.staticProperties.set(namespaceName, new Set());

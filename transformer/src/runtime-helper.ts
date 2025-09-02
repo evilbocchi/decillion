@@ -4,7 +4,7 @@ import * as ts from "typescript";
  * Manages runtime helper imports and utilities for optimized blocks
  */
 export class RuntimeHelper {
-    constructor(private context: ts.TransformationContext) { }
+    constructor(private context: ts.TransformationContext) {}
 
     /**
      * Adds a signature comment to indicate the file was transformed by Decillion
@@ -20,7 +20,7 @@ export class RuntimeHelper {
                 firstStatement,
                 ts.SyntaxKind.MultiLineCommentTrivia,
                 signature,
-                true // Add newline after comment
+                true, // Add newline after comment
             );
 
             return ts.factory.updateSourceFile(
@@ -30,7 +30,7 @@ export class RuntimeHelper {
                 sourceFile.referencedFiles,
                 sourceFile.typeReferenceDirectives,
                 sourceFile.hasNoDefaultLib,
-                sourceFile.libReferenceDirectives
+                sourceFile.libReferenceDirectives,
             );
         }
 
@@ -42,7 +42,7 @@ export class RuntimeHelper {
      */
     addRuntimeImports(sourceFile: ts.SourceFile): ts.SourceFile {
         console.log(`[RuntimeHelper] Adding runtime imports to ${sourceFile.fileName}`);
-        
+
         // Create the import declaration using TypeScript factory
         const runtimeImport = ts.factory.createImportDeclaration(
             undefined,
@@ -50,34 +50,26 @@ export class RuntimeHelper {
                 false,
                 undefined,
                 ts.factory.createNamedImports([
+                    ts.factory.createImportSpecifier(false, undefined, ts.factory.createIdentifier("useMemoizedBlock")),
+                    ts.factory.createImportSpecifier(false, undefined, ts.factory.createIdentifier("createBlock")),
                     ts.factory.createImportSpecifier(
                         false,
                         undefined,
-                        ts.factory.createIdentifier("useMemoizedBlock")
+                        ts.factory.createIdentifier("shouldUpdateBlock"),
                     ),
                     ts.factory.createImportSpecifier(
                         false,
                         undefined,
-                        ts.factory.createIdentifier("createBlock")
+                        ts.factory.createIdentifier("createStaticElement"),
                     ),
-                    ts.factory.createImportSpecifier(
-                        false,
-                        undefined,
-                        ts.factory.createIdentifier("shouldUpdateBlock")
-                    ),
-                    ts.factory.createImportSpecifier(
-                        false,
-                        undefined,
-                        ts.factory.createIdentifier("createStaticElement")
-                    )
-                ])
+                ]),
             ),
             ts.factory.createStringLiteral("@decillion/runtime"),
-            undefined
+            undefined,
         );
-        
+
         console.log(`[RuntimeHelper] Created import declaration`);
-        
+
         // Add the import to the beginning of the file
         const statements = [runtimeImport, ...sourceFile.statements];
         console.log(`[RuntimeHelper] Created ${statements.length} statements (was ${sourceFile.statements.length})`);
@@ -89,9 +81,9 @@ export class RuntimeHelper {
             sourceFile.referencedFiles,
             sourceFile.typeReferenceDirectives,
             sourceFile.hasNoDefaultLib,
-            sourceFile.libReferenceDirectives
+            sourceFile.libReferenceDirectives,
         );
-        
+
         console.log(`[RuntimeHelper] Returning updated source file`);
         return result;
     }
@@ -102,50 +94,35 @@ export class RuntimeHelper {
     createMemoizedBlockCall(
         blockFunction: ts.Expression,
         dependencies: ts.ArrayLiteralExpression,
-        blockId: string
+        blockId: string,
     ): ts.CallExpression {
-        return ts.factory.createCallExpression(
-            ts.factory.createIdentifier("useMemoizedBlock"),
-            undefined,
-            [
-                blockFunction,
-                dependencies,
-                ts.factory.createStringLiteral(blockId)
-            ]
-        );
+        return ts.factory.createCallExpression(ts.factory.createIdentifier("useMemoizedBlock"), undefined, [
+            blockFunction,
+            dependencies,
+            ts.factory.createStringLiteral(blockId),
+        ]);
     }
 
     /**
      * Creates a shouldUpdate check
      */
-    createShouldUpdateCheck(
-        prevDeps: ts.Expression,
-        nextDeps: ts.Expression
-    ): ts.CallExpression {
-        return ts.factory.createCallExpression(
-            ts.factory.createIdentifier("shouldUpdateBlock"),
-            undefined,
-            [prevDeps, nextDeps]
-        );
+    createShouldUpdateCheck(prevDeps: ts.Expression, nextDeps: ts.Expression): ts.CallExpression {
+        return ts.factory.createCallExpression(ts.factory.createIdentifier("shouldUpdateBlock"), undefined, [
+            prevDeps,
+            nextDeps,
+        ]);
     }
 
     /**
      * Creates an optimized block creator
      */
-    createBlockCreator(
-        renderFunction: ts.Expression,
-        staticProps?: ts.ObjectLiteralExpression
-    ): ts.CallExpression {
+    createBlockCreator(renderFunction: ts.Expression, staticProps?: ts.ObjectLiteralExpression): ts.CallExpression {
         const args: ts.Expression[] = [renderFunction];
 
         if (staticProps) {
             args.push(staticProps);
         }
 
-        return ts.factory.createCallExpression(
-            ts.factory.createIdentifier("createBlock"),
-            undefined,
-            args
-        );
+        return ts.factory.createCallExpression(ts.factory.createIdentifier("createBlock"), undefined, args);
     }
 }

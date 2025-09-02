@@ -1,20 +1,20 @@
 /// <reference types="@rbxts/types" />
 /// <reference types="./globals.d.ts" />
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from "vitest";
 
-describe('Test Infrastructure', () => {
-    it('should have working test environment', () => {
+describe("Test Infrastructure", () => {
+    it("should have working test environment", () => {
         expect(true).toBe(true);
     });
 
-    it('should have Roblox globals available', () => {
+    it("should have Roblox globals available", () => {
         expect(UDim2).toBeDefined();
         expect(Vector2).toBeDefined();
         expect(Color3).toBeDefined();
         expect(React).toBeDefined();
     });
 
-    it('should be able to create Roblox objects', () => {
+    it("should be able to create Roblox objects", () => {
         const udim = new UDim2(1, 0, 1, 0);
         expect(udim.X).toBe(1);
         expect(udim.Width).toBe(0);
@@ -29,9 +29,9 @@ describe('Test Infrastructure', () => {
         expect(color.B).toBe(0);
     });
 
-    it('should be able to create React elements', () => {
-        const element = React.createElement('textlabel', { Text: 'Hello' });
-        expect(element.type).toBe('textlabel');
-        expect(element.props.Text).toBe('Hello');
+    it("should be able to create React elements", () => {
+        const element = React.createElement("textlabel", { Text: "Hello" });
+        expect(element.type).toBe("textlabel");
+        expect(element.props.Text).toBe("Hello");
     });
 });

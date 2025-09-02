@@ -1,6 +1,12 @@
 import * as ts from "typescript";
 import { BlockAnalyzer } from "./analyzer";
-import { DecillionTransformer, transformJsxElement, hasUndecillionDecorator, getFunctionName, shouldSkipTransformation } from "./transformer";
+import {
+    DecillionTransformer,
+    transformJsxElement,
+    hasUndecillionDecorator,
+    getFunctionName,
+    shouldSkipTransformation,
+} from "./transformer";
 import type { OptimizationContext, PropInfo, StaticElementInfo } from "./types";
 
 /**
@@ -40,22 +46,19 @@ export default function (program: ts.Program, options: DecillionTransformerOptio
 
             // Initialize transformation context with the new architecture
             const blockAnalyzer = new BlockAnalyzer(program.getTypeChecker(), context, program, debug);
-            const transformer = new DecillionTransformer(
-                program.getTypeChecker(),
-                context,
-                blockAnalyzer
-            );
+            const transformer = new DecillionTransformer(program.getTypeChecker(), context, blockAnalyzer);
             const optimizationContext = transformer.getContext();
 
             let needsRuntimeImport = false;
 
             // First pass: scan for functions with @undecillion decorator
             const scanVisitor = (node: ts.Node): void => {
-                if (ts.isFunctionDeclaration(node) || 
-                    ts.isFunctionExpression(node) || 
-                    ts.isArrowFunction(node) || 
-                    ts.isMethodDeclaration(node)) {
-                    
+                if (
+                    ts.isFunctionDeclaration(node) ||
+                    ts.isFunctionExpression(node) ||
+                    ts.isArrowFunction(node) ||
+                    ts.isMethodDeclaration(node)
+                ) {
                     if (hasUndecillionDecorator(node)) {
                         const functionName = getFunctionName(node);
                         if (functionName) {
@@ -66,7 +69,7 @@ export default function (program: ts.Program, options: DecillionTransformerOptio
                         }
                     }
                 }
-                
+
                 ts.forEachChild(node, scanVisitor);
             };
 
@@ -76,26 +79,27 @@ export default function (program: ts.Program, options: DecillionTransformerOptio
             // Main visitor function
             const visitNode = (node: ts.Node): ts.Node => {
                 // Track function context for @undecillion detection
-                if (ts.isFunctionDeclaration(node) || 
-                    ts.isFunctionExpression(node) || 
-                    ts.isArrowFunction(node) || 
-                    ts.isMethodDeclaration(node)) {
-                    
+                if (
+                    ts.isFunctionDeclaration(node) ||
+                    ts.isFunctionExpression(node) ||
+                    ts.isArrowFunction(node) ||
+                    ts.isMethodDeclaration(node)
+                ) {
                     const functionName = getFunctionName(node);
-                    
+
                     // Push function context
                     if (functionName) {
                         optimizationContext.functionContextStack.push(functionName);
                     }
-                    
+
                     // Visit children with updated context
                     const result = ts.visitEachChild(node, visitNode, context);
-                    
+
                     // Pop function context
                     if (functionName) {
                         optimizationContext.functionContextStack.pop();
                     }
-                    
+
                     return result;
                 }
 
@@ -104,7 +108,9 @@ export default function (program: ts.Program, options: DecillionTransformerOptio
                     // Check if we should skip transformation for this JSX element
                     if (shouldSkipTransformation(optimizationContext)) {
                         if (debug) {
-                            console.log(`Skipping JSX transformation due to @undecillion decorator: ${getTagName(node)}`);
+                            console.log(
+                                `Skipping JSX transformation due to @undecillion decorator: ${getTagName(node)}`,
+                            );
                         }
                         // Return the original JSX node without transformation
                         return ts.visitEachChild(node, visitNode, context);
@@ -119,10 +125,7 @@ export default function (program: ts.Program, options: DecillionTransformerOptio
 
                     // Store any static elements that were generated
                     if (result.staticElement) {
-                        optimizationContext.staticElements.set(
-                            result.staticElement.id,
-                            result.staticElement
-                        );
+                        optimizationContext.staticElements.set(result.staticElement.id, result.staticElement);
                     }
 
                     if (debug) {
@@ -150,7 +153,7 @@ export default function (program: ts.Program, options: DecillionTransformerOptio
                     needsRuntimeImport,
                     optimizationContext,
                     addSignature,
-                    signatureMessage
+                    signatureMessage,
                 );
 
                 if (debug) {
@@ -178,9 +181,9 @@ function shouldSkipFile(file: ts.SourceFile, debug: boolean): boolean {
     const sourceText = file.getFullText();
 
     // Check for //undecillion comment
-    const lines = sourceText.split('\n');
-    const firstNonEmptyLine = lines.find(line => line.trim().length > 0);
-    if (firstNonEmptyLine && firstNonEmptyLine.trim().startsWith('//undecillion')) {
+    const lines = sourceText.split("\n");
+    const firstNonEmptyLine = lines.find((line) => line.trim().length > 0);
+    if (firstNonEmptyLine && firstNonEmptyLine.trim().startsWith("//undecillion")) {
         if (debug) {
             console.log(`Skipping transformation for ${file.fileName} due to //undecillion comment`);
         }
@@ -188,7 +191,7 @@ function shouldSkipFile(file: ts.SourceFile, debug: boolean): boolean {
     }
 
     // Quick check: if the file doesn't contain JSX, don't transform it
-    if (!sourceText.includes('<') && !sourceText.includes('React.createElement')) {
+    if (!sourceText.includes("<") && !sourceText.includes("React.createElement")) {
         return true;
     }
 
@@ -199,9 +202,7 @@ function shouldSkipFile(file: ts.SourceFile, debug: boolean): boolean {
  * Gets the tag name from a JSX element
  */
 function getTagName(node: ts.JsxElement | ts.JsxSelfClosingElement): string {
-    const tagName = ts.isJsxElement(node)
-        ? node.openingElement.tagName
-        : node.tagName;
+    const tagName = ts.isJsxElement(node) ? node.openingElement.tagName : node.tagName;
 
     if (ts.isIdentifier(tagName)) {
         return tagName.text;
@@ -218,7 +219,7 @@ function applyPostTransformations(
     needsRuntimeImport: boolean,
     context: OptimizationContext,
     addSignature: boolean,
-    signatureMessage?: string
+    signatureMessage?: string,
 ): ts.SourceFile {
     let transformedFile = file;
 
@@ -234,7 +235,8 @@ function applyPostTransformations(
 
     // Add signature comment if requested
     if (addSignature) {
-        const signature = signatureMessage || "Optimized by Decillion - Million.js-style block memoization for Roblox-TS";
+        const signature =
+            signatureMessage || "Optimized by Decillion - Million.js-style block memoization for Roblox-TS";
         transformedFile = addSignatureComment(transformedFile, signature);
     }
 
@@ -251,19 +253,11 @@ function addRuntimeImport(file: ts.SourceFile): ts.SourceFile {
             false,
             undefined,
             ts.factory.createNamedImports([
-                ts.factory.createImportSpecifier(
-                    false,
-                    undefined,
-                    ts.factory.createIdentifier("createStaticElement")
-                ),
-                ts.factory.createImportSpecifier(
-                    false,
-                    undefined,
-                    ts.factory.createIdentifier("useMemoizedBlock")
-                )
-            ])
+                ts.factory.createImportSpecifier(false, undefined, ts.factory.createIdentifier("createStaticElement")),
+                ts.factory.createImportSpecifier(false, undefined, ts.factory.createIdentifier("useMemoizedBlock")),
+            ]),
         ),
-        ts.factory.createStringLiteral("@decillion/runtime")
+        ts.factory.createStringLiteral("@decillion/runtime"),
     );
 
     const statements = [runtimeImportDeclaration, ...file.statements];
@@ -275,27 +269,24 @@ function addRuntimeImport(file: ts.SourceFile): ts.SourceFile {
         file.referencedFiles,
         file.typeReferenceDirectives,
         file.hasNoDefaultLib,
-        file.libReferenceDirectives
+        file.libReferenceDirectives,
     );
 }
 
 /**
  * Adds static props tables and static elements to the file at module level
  */
-function addStaticDeclarations(
-    file: ts.SourceFile,
-    context: OptimizationContext
-): ts.SourceFile {
+function addStaticDeclarations(file: ts.SourceFile, context: OptimizationContext): ts.SourceFile {
     const moduleStatements: ts.Statement[] = [];
 
     // Group static props by tag name for better organization
     const propsByTag = new Map<string, Array<{ id: string; props: PropInfo[] }>>();
-    
+
     for (const [id, props] of context.staticPropsTables) {
         // Extract tag name from the ID (e.g., STATIC_PROPS_TEXTLABEL_mrs9jq -> textlabel)
         const tagMatch = id.match(/STATIC_PROPS_([A-Z]+)_/);
-        const tagName = tagMatch ? tagMatch[1].toLowerCase() : 'unknown';
-        
+        const tagName = tagMatch ? tagMatch[1].toLowerCase() : "unknown";
+
         if (!propsByTag.has(tagName)) {
             propsByTag.set(tagName, []);
         }
@@ -309,24 +300,16 @@ function addStaticDeclarations(
     if (context.staticPropsTables.size > 0 || context.staticElements.size > 0) {
         const commentText = " Static declarations - extracted from render functions for optimal performance";
         const separatorComment = ts.factory.createEmptyStatement();
-        ts.addSyntheticLeadingComment(
-            separatorComment,
-            ts.SyntaxKind.SingleLineCommentTrivia,
-            commentText,
-            true
-        );
+        ts.addSyntheticLeadingComment(separatorComment, ts.SyntaxKind.SingleLineCommentTrivia, commentText, true);
         moduleStatements.push(separatorComment);
     }
 
     // First add all static props tables (since elements depend on them)
-    for (const [tagName, propsEntries] of propsByTag) {
+    for (const [, propsEntries] of propsByTag) {
         for (const { id, props } of propsEntries) {
             // Create const STATIC_PROPS_XXX = { ... };
-            const properties = props.map(prop =>
-                ts.factory.createPropertyAssignment(
-                    ts.factory.createIdentifier(prop.name),
-                    prop.value
-                )
+            const properties = props.map((prop) =>
+                ts.factory.createPropertyAssignment(ts.factory.createIdentifier(prop.name), prop.value),
             );
 
             const propsObject = ts.factory.createObjectLiteralExpression(properties, true);
@@ -334,14 +317,16 @@ function addStaticDeclarations(
             const constDeclaration = ts.factory.createVariableStatement(
                 undefined,
                 ts.factory.createVariableDeclarationList(
-                    [ts.factory.createVariableDeclaration(
-                        ts.factory.createIdentifier(id),
-                        undefined,
-                        undefined,
-                        propsObject
-                    )],
-                    ts.NodeFlags.Const
-                )
+                    [
+                        ts.factory.createVariableDeclaration(
+                            ts.factory.createIdentifier(id),
+                            undefined,
+                            undefined,
+                            propsObject,
+                        ),
+                    ],
+                    ts.NodeFlags.Const,
+                ),
             );
 
             moduleStatements.push(constDeclaration);
@@ -354,14 +339,16 @@ function addStaticDeclarations(
         const elementDeclaration = ts.factory.createVariableStatement(
             undefined,
             ts.factory.createVariableDeclarationList(
-                [ts.factory.createVariableDeclaration(
-                    ts.factory.createIdentifier(id),
-                    undefined,
-                    undefined,
-                    info.element
-                )],
-                ts.NodeFlags.Const
-            )
+                [
+                    ts.factory.createVariableDeclaration(
+                        ts.factory.createIdentifier(id),
+                        undefined,
+                        undefined,
+                        info.element,
+                    ),
+                ],
+                ts.NodeFlags.Const,
+            ),
         );
 
         moduleStatements.push(elementDeclaration);
@@ -388,7 +375,7 @@ function addStaticDeclarations(
         file.referencedFiles,
         file.typeReferenceDirectives,
         file.hasNoDefaultLib,
-        file.libReferenceDirectives
+        file.libReferenceDirectives,
     );
 }
 
@@ -396,7 +383,7 @@ function addStaticDeclarations(
  * Performs topological sort on static elements to ensure dependencies are declared first
  */
 function topologicalSortElements(
-    staticElements: Map<string, StaticElementInfo>
+    staticElements: Map<string, StaticElementInfo>,
 ): Array<{ id: string; info: StaticElementInfo }> {
     const result: Array<{ id: string; info: StaticElementInfo }> = [];
     const visited = new Set<string>();
@@ -405,16 +392,16 @@ function topologicalSortElements(
     // Extract dependencies from a call expression (children that reference other static elements)
     function extractDependencies(expr: ts.CallExpression): string[] {
         const deps: string[] = [];
-        
+
         // Recursively walk the expression tree to find all identifiers
         function walkExpression(node: ts.Node): void {
-            if (ts.isIdentifier(node) && node.text.startsWith('STATIC_ELEMENT_')) {
+            if (ts.isIdentifier(node) && node.text.startsWith("STATIC_ELEMENT_")) {
                 deps.push(node.text);
             }
-            
+
             ts.forEachChild(node, walkExpression);
         }
-        
+
         walkExpression(expr);
         return deps;
     }
@@ -423,7 +410,7 @@ function topologicalSortElements(
         if (visited.has(elementId)) {
             return;
         }
-        
+
         if (visiting.has(elementId)) {
             // Circular dependency detected - for now, just continue
             // In a more robust implementation, we might want to handle this better
@@ -466,7 +453,7 @@ function addSignatureComment(file: ts.SourceFile, signature: string): ts.SourceF
         file,
         ts.SyntaxKind.SingleLineCommentTrivia,
         ` ${signature}`,
-        true
+        true,
     );
 
     return commentNode;

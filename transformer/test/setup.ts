@@ -4,9 +4,11 @@ import 'vitest';
 // Mock React for runtime tests
 const mockReact = {
     createElement: (type: any, props: any, ...children: any[]) => ({
-        type, props, children,
-        $$typeof: Symbol.for('react.element')
-    })
+        type,
+        props,
+        children,
+        $$typeof: Symbol.for("react.element"),
+    }),
 };
 (globalThis as any).React = mockReact;
 export type React = typeof mockReact;
@@ -71,20 +73,34 @@ class MockColor3 {
         const x = c * (1 - Math.abs(((h / 60) % 2) - 1));
         const m = v - c;
 
-        let r = 0, g = 0, b = 0;
+        let r = 0,
+            g = 0,
+            b = 0;
 
         if (0 <= h && h < 60) {
-            r = c; g = x; b = 0;
+            r = c;
+            g = x;
+            b = 0;
         } else if (60 <= h && h < 120) {
-            r = x; g = c; b = 0;
+            r = x;
+            g = c;
+            b = 0;
         } else if (120 <= h && h < 180) {
-            r = 0; g = c; b = x;
+            r = 0;
+            g = c;
+            b = x;
         } else if (180 <= h && h < 240) {
-            r = 0; g = x; b = c;
+            r = 0;
+            g = x;
+            b = c;
         } else if (240 <= h && h < 300) {
-            r = x; g = 0; b = c;
+            r = x;
+            g = 0;
+            b = c;
         } else if (300 <= h && h < 360) {
-            r = c; g = 0; b = x;
+            r = c;
+            g = 0;
+            b = x;
         }
 
         return new MockColor3(r + m, g + m, b + m);

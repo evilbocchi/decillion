@@ -4,4 +4,5 @@ declare global {
     const React: React;
 }
 
-export {};
+export { };
+

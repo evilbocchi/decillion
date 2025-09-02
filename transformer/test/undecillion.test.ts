@@ -1,31 +1,26 @@
-import { describe, it, expect } from "vitest";
 import * as ts from "typescript";
-import { hasUndecillionDecorator, getFunctionName } from "../src/transformer";
+import { describe, expect, it } from "vitest";
+import { getFunctionName, hasUndecillionDecorator } from "../src/transformer";
 
 describe("@undecillion decorator detection", () => {
     function createSourceFile(code: string): ts.SourceFile {
-        return ts.createSourceFile(
-            "test.tsx",
-            code,
-            ts.ScriptTarget.ES2020,
-            true,
-            ts.ScriptKind.TSX
-        );
+        return ts.createSourceFile("test.tsx", code, ts.ScriptTarget.ES2020, true, ts.ScriptKind.TSX);
     }
 
     function findFunctionInFile(sourceFile: ts.SourceFile): ts.FunctionDeclaration | ts.ArrowFunction | null {
         let foundFunction: ts.FunctionDeclaration | ts.ArrowFunction | null = null;
-        
+
         function visit(node: ts.Node) {
             if (ts.isFunctionDeclaration(node) || ts.isArrowFunction(node)) {
-                if (!foundFunction) { // Get the first one found
+                if (!foundFunction) {
+                    // Get the first one found
                     foundFunction = node;
                 }
                 return;
             }
             ts.forEachChild(node, visit);
         }
-        
+
         visit(sourceFile);
         return foundFunction;
     }
@@ -36,10 +31,10 @@ describe("@undecillion decorator detection", () => {
 function TestComponent() {
     return <div>test</div>;
 }`;
-        
+
         const sourceFile = createSourceFile(code);
         const functionNode = findFunctionInFile(sourceFile);
-        
+
         expect(functionNode).toBeTruthy();
         expect(hasUndecillionDecorator(functionNode!)).toBe(true);
     });
@@ -50,10 +45,10 @@ function TestComponent() {
 const TestComponent = () => {
     return <div>test</div>;
 };`;
-        
+
         const sourceFile = createSourceFile(code);
         const functionNode = findFunctionInFile(sourceFile);
-        
+
         expect(functionNode).toBeTruthy();
         expect(hasUndecillionDecorator(functionNode!)).toBe(true);
     });
@@ -67,10 +62,10 @@ const TestComponent = () => {
 function TestComponent() {
     return <div>test</div>;
 }`;
-        
+
         const sourceFile = createSourceFile(code);
         const functionNode = findFunctionInFile(sourceFile);
-        
+
         expect(functionNode).toBeTruthy();
         expect(hasUndecillionDecorator(functionNode!)).toBe(true);
     });
@@ -80,10 +75,10 @@ function TestComponent() {
 function TestComponent() {
     return <div>test</div>;
 }`;
-        
+
         const sourceFile = createSourceFile(code);
         const functionNode = findFunctionInFile(sourceFile);
-        
+
         expect(functionNode).toBeTruthy();
         expect(hasUndecillionDecorator(functionNode!)).toBe(false);
     });
@@ -97,10 +92,10 @@ const someOtherCode = true;
 function TestComponent() {
     return <div>test</div>;
 }`;
-        
+
         const sourceFile = createSourceFile(code);
         const functionNode = findFunctionInFile(sourceFile);
-        
+
         expect(functionNode).toBeTruthy();
         expect(hasUndecillionDecorator(functionNode!)).toBe(false);
     });
@@ -110,10 +105,10 @@ function TestComponent() {
 function TestComponent() {
     return <div>test</div>;
 }`;
-        
+
         const sourceFile = createSourceFile(code);
         const functionNode = findFunctionInFile(sourceFile);
-        
+
         expect(functionNode).toBeTruthy();
         expect(getFunctionName(functionNode!)).toBe("TestComponent");
     });
@@ -123,10 +118,10 @@ function TestComponent() {
 const TestComponent = () => {
     return <div>test</div>;
 };`;
-        
+
         const sourceFile = createSourceFile(code);
         const functionNode = findFunctionInFile(sourceFile);
-        
+
         expect(functionNode).toBeTruthy();
         expect(getFunctionName(functionNode!)).toBe("TestComponent");
     });

@@ -24,7 +24,7 @@ export class BlockAnalyzer {
         private typeChecker: ts.TypeChecker,
         private context: ts.TransformationContext,
         private program?: ts.Program,
-        private debug = false
+        private debug = false,
     ) {
         // Initialize the Roblox static detector
         if (program) {
@@ -42,7 +42,7 @@ export class BlockAnalyzer {
 
         const blockId = `block_${this.blockCounter++}`;
         const tagName = this.getJsxTagName(node);
-        
+
         const blockInfo: BlockInfo = {
             id: blockId,
             staticProps: [],
@@ -50,7 +50,7 @@ export class BlockAnalyzer {
             hasDynamicChildren: false,
             isStatic: true,
             dependencies: [],
-            dependencyTypes: new Map()
+            dependencyTypes: new Map(),
         };
 
         // React components (PascalCase) should never be treated as static
@@ -72,7 +72,11 @@ export class BlockAnalyzer {
                     if (this.isDynamicExpression(attr.initializer.expression)) {
                         blockInfo.dynamicProps.push(propName);
                         blockInfo.isStatic = false;
-                        this.extractDependencies(attr.initializer.expression, blockInfo.dependencies, blockInfo.dependencyTypes);
+                        this.extractDependencies(
+                            attr.initializer.expression,
+                            blockInfo.dependencies,
+                            blockInfo.dependencyTypes,
+                        );
                     } else {
                         blockInfo.staticProps.push(propName);
                     }
@@ -95,12 +99,12 @@ export class BlockAnalyzer {
                     if (!childBlock.isStatic) {
                         blockInfo.hasDynamicChildren = true;
                         blockInfo.isStatic = false;
-                        
+
                         // Merge dependencies and their types from child blocks
                         for (const dep of childBlock.dependencies) {
                             if (!blockInfo.dependencies.includes(dep)) {
                                 blockInfo.dependencies.push(dep);
-                                
+
                                 // Also merge the dependency type information
                                 if (childBlock.dependencyTypes?.has(dep) && blockInfo.dependencyTypes) {
                                     blockInfo.dependencyTypes.set(dep, childBlock.dependencyTypes.get(dep)!);
@@ -121,7 +125,7 @@ export class BlockAnalyzer {
         // Remove duplicates from dependencies while preserving order and types
         const uniqueDeps: string[] = [];
         const uniqueDepTypes = new Map<string, DependencyInfo>();
-        
+
         for (const dep of blockInfo.dependencies) {
             if (!uniqueDeps.includes(dep)) {
                 uniqueDeps.push(dep);
@@ -131,7 +135,7 @@ export class BlockAnalyzer {
                 }
             }
         }
-        
+
         blockInfo.dependencies = uniqueDeps;
         blockInfo.dependencyTypes = uniqueDepTypes;
 
@@ -167,7 +171,7 @@ export class BlockAnalyzer {
             // Use the Roblox static detector for more comprehensive detection
             if (robloxStaticDetector.isStaticRobloxCall(expr)) {
                 // Check if all arguments are static (don't contain variables)
-                return expr.arguments.some(arg => this.isDynamicExpression(arg as ts.Expression));
+                return expr.arguments.some((arg) => this.isDynamicExpression(arg as ts.Expression));
             }
 
             return true;
@@ -177,16 +181,16 @@ export class BlockAnalyzer {
         if (ts.isNewExpression(expr)) {
             // Use the Roblox static detector
             if (robloxStaticDetector.isStaticRobloxNew(expr)) {
-                return expr.arguments ? expr.arguments.some(arg => this.isDynamicExpression(arg as ts.Expression)) : false;
+                return expr.arguments
+                    ? expr.arguments.some((arg) => this.isDynamicExpression(arg as ts.Expression))
+                    : false;
             }
             return true;
         }
 
         // Check for template literals with expressions
         if (ts.isTemplateExpression(expr)) {
-            return expr.templateSpans.some(span =>
-                this.isDynamicExpression(span.expression)
-            );
+            return expr.templateSpans.some((span) => this.isDynamicExpression(span.expression));
         }
 
         // Check for binary expressions
@@ -201,13 +205,11 @@ export class BlockAnalyzer {
 
         // Check for array/object literals with dynamic content
         if (ts.isArrayLiteralExpression(expr)) {
-            return expr.elements.some(el =>
-                ts.isExpression(el) && this.isDynamicExpression(el)
-            );
+            return expr.elements.some((el) => ts.isExpression(el) && this.isDynamicExpression(el));
         }
 
         if (ts.isObjectLiteralExpression(expr)) {
-            return expr.properties.some(prop => {
+            return expr.properties.some((prop) => {
                 if (ts.isPropertyAssignment(prop)) {
                     return this.isDynamicExpression(prop.initializer);
                 } else if (ts.isShorthandPropertyAssignment(prop)) {
@@ -232,19 +234,19 @@ export class BlockAnalyzer {
             if (!deps.includes(expr.text)) {
                 deps.push(expr.text);
             }
-            
+
             if (depTypes && !depTypes.has(expr.text)) {
                 // Try to get the type of this identifier
                 const type = this.typeChecker.getTypeAtLocation(expr);
                 const typeNode = this.typeChecker.typeToTypeNode(
-                    type, 
-                    expr, 
-                    ts.NodeBuilderFlags.InTypeAlias | ts.NodeBuilderFlags.UseAliasDefinedOutsideCurrentScope
+                    type,
+                    expr,
+                    ts.NodeBuilderFlags.InTypeAlias | ts.NodeBuilderFlags.UseAliasDefinedOutsideCurrentScope,
                 );
                 depTypes.set(expr.text, {
                     name: expr.text,
                     type: typeNode,
-                    sourceNode: expr
+                    sourceNode: expr,
                 });
             }
             return;
@@ -273,7 +275,7 @@ export class BlockAnalyzer {
             // Use the Roblox static detector for more comprehensive detection
             if (robloxStaticDetector.isStaticRobloxCall(expr)) {
                 // Only extract dependencies from arguments, not the constructor itself
-                expr.arguments.forEach(arg => {
+                expr.arguments.forEach((arg) => {
                     if (ts.isExpression(arg)) {
                         this.extractDependencies(arg, deps, depTypes);
                     }
@@ -283,7 +285,7 @@ export class BlockAnalyzer {
 
             // For other call expressions, extract from both the function and arguments
             this.extractDependencies(expr.expression, deps, depTypes);
-            expr.arguments.forEach(arg => {
+            expr.arguments.forEach((arg) => {
                 if (ts.isExpression(arg)) {
                     this.extractDependencies(arg, deps, depTypes);
                 }
@@ -297,7 +299,7 @@ export class BlockAnalyzer {
             if (robloxStaticDetector.isStaticRobloxNew(expr)) {
                 // Only extract dependencies from arguments, not the constructor itself
                 if (expr.arguments) {
-                    expr.arguments.forEach(arg => {
+                    expr.arguments.forEach((arg) => {
                         if (ts.isExpression(arg)) {
                             this.extractDependencies(arg, deps, depTypes);
                         }
@@ -308,7 +310,7 @@ export class BlockAnalyzer {
             // For other new expressions, extract dependencies normally
             this.extractDependencies(expr.expression, deps, depTypes);
             if (expr.arguments) {
-                expr.arguments.forEach(arg => {
+                expr.arguments.forEach((arg) => {
                     if (ts.isExpression(arg)) {
                         this.extractDependencies(arg, deps, depTypes);
                     }
@@ -318,9 +320,7 @@ export class BlockAnalyzer {
         }
 
         if (ts.isTemplateExpression(expr)) {
-            expr.templateSpans.forEach(span =>
-                this.extractDependencies(span.expression, deps, depTypes)
-            );
+            expr.templateSpans.forEach((span) => this.extractDependencies(span.expression, deps, depTypes));
             return;
         }
 
@@ -338,7 +338,7 @@ export class BlockAnalyzer {
         }
 
         if (ts.isObjectLiteralExpression(expr)) {
-            expr.properties.forEach(prop => {
+            expr.properties.forEach((prop) => {
                 if (ts.isPropertyAssignment(prop)) {
                     this.extractDependencies(prop.initializer, deps, depTypes);
                 } else if (ts.isShorthandPropertyAssignment(prop)) {
@@ -346,23 +346,23 @@ export class BlockAnalyzer {
                     if (!deps.includes(prop.name.text)) {
                         deps.push(prop.name.text);
                     }
-                    
+
                     if (depTypes && !depTypes.has(prop.name.text)) {
                         const type = this.typeChecker.getTypeAtLocation(prop.name);
                         const typeNode = this.typeChecker.typeToTypeNode(
-                            type, 
-                            prop.name, 
-                            ts.NodeBuilderFlags.InTypeAlias | ts.NodeBuilderFlags.UseAliasDefinedOutsideCurrentScope
+                            type,
+                            prop.name,
+                            ts.NodeBuilderFlags.InTypeAlias | ts.NodeBuilderFlags.UseAliasDefinedOutsideCurrentScope,
                         );
                         depTypes.set(prop.name.text, {
                             name: prop.name.text,
                             type: typeNode,
-                            sourceNode: prop.name
+                            sourceNode: prop.name,
                         });
                     }
                 } else if (ts.isMethodDeclaration(prop)) {
                     // Method declarations might contain dependencies in their body
-                    ts.forEachChild(prop, child => {
+                    ts.forEachChild(prop, (child) => {
                         if (ts.isExpression(child)) {
                             this.extractDependencies(child, deps, depTypes);
                         }
@@ -373,7 +373,7 @@ export class BlockAnalyzer {
         }
 
         if (ts.isArrayLiteralExpression(expr)) {
-            expr.elements.forEach(el => {
+            expr.elements.forEach((el) => {
                 if (ts.isExpression(el)) {
                     this.extractDependencies(el, deps, depTypes);
                 }
@@ -382,7 +382,7 @@ export class BlockAnalyzer {
         }
 
         // Handle other expression types as needed
-        ts.forEachChild(expr, child => {
+        ts.forEachChild(expr, (child) => {
             if (ts.isExpression(child)) {
                 this.extractDependencies(child, deps, depTypes);
             }
@@ -403,9 +403,7 @@ export class BlockAnalyzer {
      * Gets the tag name from a JSX element
      */
     getJsxTagName(node: ts.JsxElement | ts.JsxSelfClosingElement): string {
-        const tagName = ts.isJsxElement(node)
-            ? node.openingElement.tagName
-            : node.tagName;
+        const tagName = ts.isJsxElement(node) ? node.openingElement.tagName : node.tagName;
 
         if (ts.isIdentifier(tagName)) {
             return tagName.text;
@@ -424,8 +422,7 @@ export class BlockAnalyzer {
         }
 
         // Memoize if it has dynamic props or children and has dependencies
-        if ((blockInfo.dynamicProps.length > 0 || blockInfo.hasDynamicChildren) &&
-            blockInfo.dependencies.length > 0) {
+        if ((blockInfo.dynamicProps.length > 0 || blockInfo.hasDynamicChildren) && blockInfo.dependencies.length > 0) {
             return true;
         }
 
