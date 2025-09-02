@@ -7,14 +7,14 @@ local _react = TS.import(script, game:GetService("ReplicatedStorage"), "rbxts_in
 local React = _react
 local useState = _react.useState
 -- Static declarations - extracted from render functions for optimal performance
-local STATIC_PROPS_TEXTLABEL_t3bil5 = {
-	Text = "Check console for render times. Optimized should be significantly faster!",
+local STATIC_PROPS_TEXTLABEL_phdbj7 = {
+	Text = "Full re-render forces all items to recreate. Highlight-only should be much faster!",
 	Size = UDim2.new(1, 0, 0, 20),
-	Position = UDim2.new(0, 0, 0, 55),
+	Position = UDim2.new(0, 0, 0, 85),
 	TextColor3 = Color3.fromRGB(200, 200, 200),
 	BackgroundTransparency = 1,
 }
-local STATIC_ELEMENT_TEXTLABEL_9kr4as = createStaticElement("TextLabel", STATIC_PROPS_TEXTLABEL_t3bil5)
+local STATIC_ELEMENT_TEXTLABEL_j50j3c = createStaticElement("TextLabel", STATIC_PROPS_TEXTLABEL_phdbj7)
 --[[
 	*
 	 * Simple Performance Test: Shows the clear difference between optimized and unoptimized rendering
@@ -67,13 +67,14 @@ local function OptimizedItem(_param)
 			propName = "Text",
 			path = { 0, 0 },
 		} },
-	} }, "dynamic_frame_8t2oirkzy")
+	} }, "dynamic_frame_jpwkoi7l8")
 end
 local function SimplePerformanceTest()
 	local itemCount, setItemCount = useState(500)
 	local useOptimized, setUseOptimized = useState(true)
 	local renderTrigger, setRenderTrigger = useState(0)
 	local highlightIndex, setHighlightIndex = useState(0)
+	local lastRenderTime, setLastRenderTime = useState(0)
 	-- Generate test items
 	local items = {}
 	do
@@ -98,26 +99,39 @@ local function SimplePerformanceTest()
 	end
 	local triggerRender = function()
 		local start = tick()
+		-- Update states - React should batch these automatically in modern versions
 		setRenderTrigger(renderTrigger + 1)
-		-- Move highlight to next item
+		setHighlightIndex((highlightIndex + 1) % itemCount)
+		-- Use multiple frame waits to ensure render completion
+		task.spawn(function()
+			task.wait()
+			task.wait()
+			local elapsed = (tick() - start) * 1000
+			setLastRenderTime(elapsed)
+			print(`Render time: {string.format("%.2f", elapsed)}ms ({if useOptimized then "Optimized" else "Unoptimized"}) - Items: {itemCount}`)
+		end)
+	end
+	-- Test just highlight changes (should be much faster)
+	local triggerHighlightOnly = function()
+		local start = tick()
 		setHighlightIndex((highlightIndex + 1) % itemCount)
 		task.spawn(function()
 			task.wait()
 			local elapsed = (tick() - start) * 1000
-			print(`Render time: {string.format("%.2f", elapsed)}ms ({if useOptimized then "Optimized" else "Unoptimized"})`)
+			print(`Highlight-only time: {string.format("%.2f", elapsed)}ms ({if useOptimized then "Optimized" else "Unoptimized"}) - Items: {itemCount}`)
 		end)
 	end
 	local ItemComponent = if useOptimized then OptimizedItem else UnoptimizedItem
-	return useFinePatchBlock(function(itemCount, useOptimized, triggerRender, items, ItemComponent)
+	return useFinePatchBlock(function(itemCount, lastRenderTime, useOptimized, triggerRender, triggerHighlightOnly, items, ItemComponent)
 		return React.createElement("frame", {
 			Size = UDim2.new(1, 0, 1, 0),
 			BackgroundColor3 = Color3.fromRGB(20, 20, 20),
-		}, useFinePatchBlock(function(itemCount, useOptimized, triggerRender)
+		}, useFinePatchBlock(function(itemCount, lastRenderTime, useOptimized, triggerRender, triggerHighlightOnly)
 			return React.createElement("frame", {
-				Size = UDim2.new(1, 0, 0, 80),
+				Size = UDim2.new(1, 0, 0, 110),
 				BackgroundColor3 = Color3.fromRGB(40, 40, 40),
 			}, React.createElement("textlabel", {
-				Text = `Simple Performance Test - {itemCount} Items`,
+				Text = `Simple Performance Test - {itemCount} Items{if lastRenderTime > 0 then ` (Last: {string.format("%.1f", lastRenderTime)}ms)` else ""}`,
 				Size = UDim2.new(1, 0, 0, 25),
 				TextColor3 = Color3.fromRGB(255, 255, 255),
 				BackgroundTransparency = 1,
@@ -133,7 +147,7 @@ local function SimplePerformanceTest()
 					end,
 				},
 			}), React.createElement("textbutton", {
-				Text = "Trigger Render Test",
+				Text = "Full Re-render Test",
 				Size = UDim2.new(0.3, 0, 0, 25),
 				Position = UDim2.new(0.35, 0, 0, 30),
 				BackgroundColor3 = Color3.fromRGB(100, 100, 150),
@@ -142,9 +156,18 @@ local function SimplePerformanceTest()
 					MouseButton1Click = triggerRender,
 				},
 			}), React.createElement("textbutton", {
-				Text = `Items: {itemCount}`,
+				Text = "Highlight-Only Test",
 				Size = UDim2.new(0.3, 0, 0, 25),
 				Position = UDim2.new(0.7, 0, 0, 30),
+				BackgroundColor3 = Color3.fromRGB(150, 100, 100),
+				TextColor3 = Color3.fromRGB(255, 255, 255),
+				Event = {
+					MouseButton1Click = triggerHighlightOnly,
+				},
+			}), React.createElement("textbutton", {
+				Text = `Items: {itemCount}`,
+				Size = UDim2.new(0.3, 0, 0, 25),
+				Position = UDim2.new(0, 0, 0, 60),
 				BackgroundColor3 = Color3.fromRGB(100, 100, 100),
 				TextColor3 = Color3.fromRGB(255, 255, 255),
 				Event = {
@@ -152,8 +175,8 @@ local function SimplePerformanceTest()
 						return setItemCount(if itemCount == 100 then 500 elseif itemCount == 500 then 1000 else 100)
 					end,
 				},
-			}), STATIC_ELEMENT_TEXTLABEL_9kr4as)
-		end, { itemCount, useOptimized, triggerRender }, { {
+			}), STATIC_ELEMENT_TEXTLABEL_j50j3c)
+		end, { itemCount, lastRenderTime, useOptimized, triggerRender, triggerHighlightOnly }, { {
 			elementPath = { 0, 0 },
 			edits = { {
 				type = 1,
@@ -185,15 +208,23 @@ local function SimplePerformanceTest()
 		}, {
 			elementPath = { 0, 3 },
 			edits = { {
+				type = 4,
+				dependencyKey = "triggerHighlightOnly",
+				propName = "Event",
+				path = { 0, 3 },
+			} },
+		}, {
+			elementPath = { 0, 4 },
+			edits = { {
 				type = 1,
 				dependencyKey = "itemCount",
 				propName = "Text",
-				path = { 0, 3 },
+				path = { 0, 4 },
 			} },
-		} }, "dynamic_frame_cgrqvsuj6"), useFinePatchBlock(function(itemCount, items, ItemComponent)
+		} }, "dynamic_frame_k2z0y3h71"), useFinePatchBlock(function(itemCount, items, ItemComponent)
 			local _exp = {
-				Size = UDim2.new(1, 0, 1, -80),
-				Position = UDim2.new(0, 0, 0, 80),
+				Size = UDim2.new(1, 0, 1, -110),
+				Position = UDim2.new(0, 0, 0, 110),
 				BackgroundColor3 = Color3.fromRGB(30, 30, 30),
 				CanvasSize = UDim2.new(0, 0, 0, itemCount * 35),
 				ScrollBarThickness = 8,
@@ -233,8 +264,8 @@ local function SimplePerformanceTest()
 				index = 1,
 				path = { 0, 1 },
 			} },
-		} }, "dynamic_scrollingframe_ih427zgaz"))
-	end, { itemCount, useOptimized, triggerRender, items, ItemComponent }, { {
+		} }, "dynamic_scrollingframe_rs66knlno"))
+	end, { itemCount, lastRenderTime, useOptimized, triggerRender, triggerHighlightOnly, items, ItemComponent }, { {
 		elementPath = { 0, 0, 0 },
 		edits = { {
 			type = 1,
@@ -266,10 +297,18 @@ local function SimplePerformanceTest()
 	}, {
 		elementPath = { 0, 0, 3 },
 		edits = { {
+			type = 4,
+			dependencyKey = "triggerHighlightOnly",
+			propName = "Event",
+			path = { 0, 0, 3 },
+		} },
+	}, {
+		elementPath = { 0, 0, 4 },
+		edits = { {
 			type = 1,
 			dependencyKey = "itemCount",
 			propName = "Text",
-			path = { 0, 0, 3 },
+			path = { 0, 0, 4 },
 		} },
 	}, {
 		elementPath = { 0, 1 },
@@ -287,7 +326,7 @@ local function SimplePerformanceTest()
 			index = 1,
 			path = { 0, 1, 1 },
 		} },
-	} }, "dynamic_frame_w7sgoepew")
+	} }, "dynamic_frame_sojph71co")
 end
 return {
 	default = SimplePerformanceTest,

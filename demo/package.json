@@ -3,7 +3,8 @@
     "private": true,
     "scripts": {
         "build": "rbxtsc",
-        "dev": "npx rojo serve"
+        "serve": "npx rojo serve",
+        "dev": "rbxtsc --watch"
     },
     "dependencies": {
         "@decillion/runtime": "0.0.0",

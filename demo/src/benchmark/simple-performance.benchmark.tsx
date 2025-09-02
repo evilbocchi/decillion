@@ -50,6 +50,7 @@ export default function SimplePerformanceTest() {
     const [useOptimized, setUseOptimized] = useState(true);
     const [renderTrigger, setRenderTrigger] = useState(0);
     const [highlightIndex, setHighlightIndex] = useState(0);
+    const [lastRenderTime, setLastRenderTime] = useState(0);
 
     // Generate test items
     const items: SimpleItemProps[] = [];
@@ -63,15 +64,30 @@ export default function SimplePerformanceTest() {
 
     const triggerRender = () => {
         const start = tick();
-        setRenderTrigger(renderTrigger + 1);
         
-        // Move highlight to next item
+        // Update states - React should batch these automatically in modern versions
+        setRenderTrigger(renderTrigger + 1);
+        setHighlightIndex((highlightIndex + 1) % itemCount);
+        
+        // Use multiple frame waits to ensure render completion
+        task.spawn(() => {
+            task.wait(); // Wait for React to schedule
+            task.wait(); // Wait for potential second frame
+            const elapsed = (tick() - start) * 1000;
+            setLastRenderTime(elapsed);
+            print(`Render time: ${string.format("%.2f", elapsed)}ms (${useOptimized ? "Optimized" : "Unoptimized"}) - Items: ${itemCount}`);
+        });
+    };
+
+    // Test just highlight changes (should be much faster)
+    const triggerHighlightOnly = () => {
+        const start = tick();
         setHighlightIndex((highlightIndex + 1) % itemCount);
         
         task.spawn(() => {
             task.wait();
             const elapsed = (tick() - start) * 1000;
-            print(`Render time: ${string.format("%.2f", elapsed)}ms (${useOptimized ? "Optimized" : "Unoptimized"})`);
+            print(`Highlight-only time: ${string.format("%.2f", elapsed)}ms (${useOptimized ? "Optimized" : "Unoptimized"}) - Items: ${itemCount}`);
         });
     };
 
@@ -80,9 +96,9 @@ export default function SimplePerformanceTest() {
     return (
         <frame Size={new UDim2(1, 0, 1, 0)} BackgroundColor3={Color3.fromRGB(20, 20, 20)}>
             {/* Control Panel */}
-            <frame Size={new UDim2(1, 0, 0, 80)} BackgroundColor3={Color3.fromRGB(40, 40, 40)}>
+            <frame Size={new UDim2(1, 0, 0, 110)} BackgroundColor3={Color3.fromRGB(40, 40, 40)}>
                 <textlabel
-                    Text={`Simple Performance Test - ${itemCount} Items`}
+                    Text={`Simple Performance Test - ${itemCount} Items${lastRenderTime > 0 ? ` (Last: ${string.format("%.1f", lastRenderTime)}ms)` : ""}`}
                     Size={new UDim2(1, 0, 0, 25)}
                     TextColor3={Color3.fromRGB(255, 255, 255)}
                     BackgroundTransparency={1}
@@ -98,7 +114,7 @@ export default function SimplePerformanceTest() {
                 />
 
                 <textbutton
-                    Text="Trigger Render Test"
+                    Text="Full Re-render Test"
                     Size={new UDim2(0.3, 0, 0, 25)}
                     Position={new UDim2(0.35, 0, 0, 30)}
                     BackgroundColor3={Color3.fromRGB(100, 100, 150)}
@@ -107,9 +123,18 @@ export default function SimplePerformanceTest() {
                 />
 
                 <textbutton
-                    Text={`Items: ${itemCount}`}
+                    Text="Highlight-Only Test"
                     Size={new UDim2(0.3, 0, 0, 25)}
                     Position={new UDim2(0.7, 0, 0, 30)}
+                    BackgroundColor3={Color3.fromRGB(150, 100, 100)}
+                    TextColor3={Color3.fromRGB(255, 255, 255)}
+                    Event={{ MouseButton1Click: triggerHighlightOnly }}
+                />
+
+                <textbutton
+                    Text={`Items: ${itemCount}`}
+                    Size={new UDim2(0.3, 0, 0, 25)}
+                    Position={new UDim2(0, 0, 0, 60)}
                     BackgroundColor3={Color3.fromRGB(100, 100, 100)}
                     TextColor3={Color3.fromRGB(255, 255, 255)}
                     Event={{ 
@@ -118,9 +143,9 @@ export default function SimplePerformanceTest() {
                 />
 
                 <textlabel
-                    Text="Check console for render times. Optimized should be significantly faster!"
+                    Text="Full re-render forces all items to recreate. Highlight-only should be much faster!"
                     Size={new UDim2(1, 0, 0, 20)}
-                    Position={new UDim2(0, 0, 0, 55)}
+                    Position={new UDim2(0, 0, 0, 85)}
                     TextColor3={Color3.fromRGB(200, 200, 200)}
                     BackgroundTransparency={1}
                 />
@@ -128,8 +153,8 @@ export default function SimplePerformanceTest() {
 
             {/* List */}
             <scrollingframe
-                Size={new UDim2(1, 0, 1, -80)}
-                Position={new UDim2(0, 0, 0, 80)}
+                Size={new UDim2(1, 0, 1, -110)}
+                Position={new UDim2(0, 0, 0, 110)}
                 BackgroundColor3={Color3.fromRGB(30, 30, 30)}
                 CanvasSize={new UDim2(0, 0, 0, itemCount * 35)}
                 ScrollBarThickness={8}
