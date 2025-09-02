@@ -2,7 +2,6 @@
     "name": "rbxts-transformer-decillion",
     "version": "0.0.0",
     "description": "A Million.js-inspired high-performance UI renderer for Roblox-TS",
-    "type": "commonjs",
     "main": "out/index.js",
     "scripts": {
         "build": "tsc",
