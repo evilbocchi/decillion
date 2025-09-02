@@ -1,7 +1,7 @@
 import * as ts from "typescript";
 import { BlockAnalyzer } from "./analyzer";
 import { DecillionTransformer, transformJsxElement, hasUndecillionDecorator, getFunctionName, shouldSkipTransformation } from "./transformer";
-import type { OptimizationContext, PropInfo } from "./types";
+import type { OptimizationContext, PropInfo, StaticElementInfo } from "./types";
 
 /**
  * Configuration options for the Decillion transformer
@@ -117,6 +117,14 @@ export default function (program: ts.Program, options: DecillionTransformerOptio
                     needsRuntimeImport = true;
                     const result = transformJsxElement(node, optimizationContext);
 
+                    // Store any static elements that were generated
+                    if (result.staticElement) {
+                        optimizationContext.staticElements.set(
+                            result.staticElement.id,
+                            result.staticElement
+                        );
+                    }
+
                     if (debug) {
                         console.log(`JSX element transformed successfully`);
                     }
@@ -219,9 +227,9 @@ function applyPostTransformations(
         transformedFile = addRuntimeImport(transformedFile);
     }
 
-    // Add static props tables if any were created
-    if (context.staticPropsTables.size > 0) {
-        transformedFile = addStaticPropsTables(transformedFile, context.staticPropsTables);
+    // Add static props tables and static elements if any were created
+    if (context.staticPropsTables.size > 0 || context.staticElements.size > 0) {
+        transformedFile = addStaticDeclarations(transformedFile, context);
     }
 
     // Add signature comment if requested
@@ -272,42 +280,94 @@ function addRuntimeImport(file: ts.SourceFile): ts.SourceFile {
 }
 
 /**
- * Adds static props tables to the file
+ * Adds static props tables and static elements to the file at module level
  */
-function addStaticPropsTables(
+function addStaticDeclarations(
     file: ts.SourceFile,
-    staticPropsTables: Map<string, PropInfo[]>
+    context: OptimizationContext
 ): ts.SourceFile {
-    const propsTableStatements: ts.Statement[] = [];
+    const moduleStatements: ts.Statement[] = [];
 
-    for (const [id, props] of staticPropsTables) {
-        // Create const STATIC_PROPS_XXX = { ... };
-        const properties = props.map(prop =>
-            ts.factory.createPropertyAssignment(
-                ts.factory.createIdentifier(prop.name),
-                prop.value
-            )
+    // Group static props by tag name for better organization
+    const propsByTag = new Map<string, Array<{ id: string; props: PropInfo[] }>>();
+    
+    for (const [id, props] of context.staticPropsTables) {
+        // Extract tag name from the ID (e.g., STATIC_PROPS_TEXTLABEL_mrs9jq -> textlabel)
+        const tagMatch = id.match(/STATIC_PROPS_([A-Z]+)_/);
+        const tagName = tagMatch ? tagMatch[1].toLowerCase() : 'unknown';
+        
+        if (!propsByTag.has(tagName)) {
+            propsByTag.set(tagName, []);
+        }
+        propsByTag.get(tagName)!.push({ id, props });
+    }
+
+    // Sort static elements by dependency order to avoid "used before declaration" errors
+    const sortedElements = topologicalSortElements(context.staticElements);
+
+    // Add comment separator for static declarations
+    if (context.staticPropsTables.size > 0 || context.staticElements.size > 0) {
+        const commentText = " Static declarations - extracted from render functions for optimal performance";
+        const separatorComment = ts.factory.createEmptyStatement();
+        ts.addSyntheticLeadingComment(
+            separatorComment,
+            ts.SyntaxKind.SingleLineCommentTrivia,
+            commentText,
+            true
         );
+        moduleStatements.push(separatorComment);
+    }
 
-        const propsObject = ts.factory.createObjectLiteralExpression(properties, true);
+    // First add all static props tables (since elements depend on them)
+    for (const [tagName, propsEntries] of propsByTag) {
+        for (const { id, props } of propsEntries) {
+            // Create const STATIC_PROPS_XXX = { ... };
+            const properties = props.map(prop =>
+                ts.factory.createPropertyAssignment(
+                    ts.factory.createIdentifier(prop.name),
+                    prop.value
+                )
+            );
 
-        const constDeclaration = ts.factory.createVariableStatement(
+            const propsObject = ts.factory.createObjectLiteralExpression(properties, true);
+
+            const constDeclaration = ts.factory.createVariableStatement(
+                undefined,
+                ts.factory.createVariableDeclarationList(
+                    [ts.factory.createVariableDeclaration(
+                        ts.factory.createIdentifier(id),
+                        undefined,
+                        undefined,
+                        propsObject
+                    )],
+                    ts.NodeFlags.Const
+                )
+            );
+
+            moduleStatements.push(constDeclaration);
+        }
+    }
+
+    // Then add static elements in dependency order
+    for (const { id, info } of sortedElements) {
+        // Create const STATIC_ELEMENT_XXX = createStaticElement(...);
+        const elementDeclaration = ts.factory.createVariableStatement(
             undefined,
             ts.factory.createVariableDeclarationList(
                 [ts.factory.createVariableDeclaration(
                     ts.factory.createIdentifier(id),
                     undefined,
                     undefined,
-                    propsObject
+                    info.element
                 )],
                 ts.NodeFlags.Const
             )
         );
 
-        propsTableStatements.push(constDeclaration);
+        moduleStatements.push(elementDeclaration);
     }
 
-    // Insert static props tables after imports but before other statements
+    // Insert static declarations after imports but before other statements
     const importStatements: ts.Statement[] = [];
     const otherStatements: ts.Statement[] = [];
 
@@ -319,7 +379,7 @@ function addStaticPropsTables(
         }
     }
 
-    const statements = [...importStatements, ...propsTableStatements, ...otherStatements];
+    const statements = [...importStatements, ...moduleStatements, ...otherStatements];
 
     return ts.factory.updateSourceFile(
         file,
@@ -330,6 +390,72 @@ function addStaticPropsTables(
         file.hasNoDefaultLib,
         file.libReferenceDirectives
     );
+}
+
+/**
+ * Performs topological sort on static elements to ensure dependencies are declared first
+ */
+function topologicalSortElements(
+    staticElements: Map<string, StaticElementInfo>
+): Array<{ id: string; info: StaticElementInfo }> {
+    const result: Array<{ id: string; info: StaticElementInfo }> = [];
+    const visited = new Set<string>();
+    const visiting = new Set<string>();
+
+    // Extract dependencies from a call expression (children that reference other static elements)
+    function extractDependencies(expr: ts.CallExpression): string[] {
+        const deps: string[] = [];
+        
+        // Recursively walk the expression tree to find all identifiers
+        function walkExpression(node: ts.Node): void {
+            if (ts.isIdentifier(node) && node.text.startsWith('STATIC_ELEMENT_')) {
+                deps.push(node.text);
+            }
+            
+            ts.forEachChild(node, walkExpression);
+        }
+        
+        walkExpression(expr);
+        return deps;
+    }
+
+    function visit(elementId: string): void {
+        if (visited.has(elementId)) {
+            return;
+        }
+        
+        if (visiting.has(elementId)) {
+            // Circular dependency detected - for now, just continue
+            // In a more robust implementation, we might want to handle this better
+            return;
+        }
+
+        const elementInfo = staticElements.get(elementId);
+        if (!elementInfo) {
+            return;
+        }
+
+        visiting.add(elementId);
+
+        // Visit dependencies first
+        const dependencies = extractDependencies(elementInfo.element);
+        for (const dep of dependencies) {
+            if (staticElements.has(dep)) {
+                visit(dep);
+            }
+        }
+
+        visiting.delete(elementId);
+        visited.add(elementId);
+        result.push({ id: elementId, info: elementInfo });
+    }
+
+    // Visit all elements
+    for (const elementId of staticElements.keys()) {
+        visit(elementId);
+    }
+
+    return result;
 }
 
 /**

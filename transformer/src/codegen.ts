@@ -32,6 +32,13 @@ export function createDependenciesArray(dependencies: string[]): ts.ArrayLiteral
 }
 
 /**
+ * Generates a unique static element identifier
+ */
+export function generateStaticElementId(tagName: string): string {
+    return `STATIC_ELEMENT_${tagName.toUpperCase()}_${Math.random().toString(36).substr(2, 6)}`;
+}
+
+/**
  * Generates a unique static props table identifier
  */
 export function generateStaticPropsId(tagName: string): string {

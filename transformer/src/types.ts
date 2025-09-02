@@ -20,10 +20,22 @@ export interface PropInfo {
     isStatic: boolean;
 }
 
+/**
+ * Information about a static element that can be extracted to module level
+ */
+export interface StaticElementInfo {
+    id: string;
+    tagName: string;
+    propsTableId: string;
+    children: ts.Expression[];
+    element: ts.CallExpression;
+}
+
 export interface TransformResult {
     element: ts.Expression;
     needsRuntimeImport: boolean;
     staticPropsTable?: { id: string; props: PropInfo[] };
+    staticElement?: StaticElementInfo;
 }
 
 export interface OptimizationContext {
@@ -33,6 +45,7 @@ export interface OptimizationContext {
     generatedBlocks: Set<string>;
     blockFunctions: Map<string, ts.FunctionDeclaration>;
     staticPropsTables: Map<string, PropInfo[]>;
+    staticElements: Map<string, StaticElementInfo>;
     blockAnalyzer?: BlockAnalyzer;
     /** Set of function/component names that should be skipped due to @undecillion decorator */
     skipTransformFunctions: Set<string>;

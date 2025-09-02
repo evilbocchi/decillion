@@ -6,9 +6,10 @@ import {
     createPropsObject,
     createStaticElementCall,
     generateBlockId,
-    generateStaticPropsId
+    generateStaticPropsId,
+    generateStaticElementId
 } from "./codegen";
-import type { OptimizationContext, PropInfo, TransformResult } from "./types";
+import type { OptimizationContext, PropInfo, TransformResult, StaticElementInfo } from "./types";
 import { robloxStaticDetector } from "./roblox-static-detector";
 
 /**
@@ -50,6 +51,7 @@ export class DecillionTransformer {
             generatedBlocks: new Set<string>(),
             blockFunctions: new Map<string, ts.FunctionDeclaration>(),
             staticPropsTables: new Map<string, PropInfo[]>(),
+            staticElements: new Map<string, any>(),
             blockAnalyzer,
             skipTransformFunctions: new Set<string>(),
             functionContextStack: []
@@ -106,12 +108,13 @@ export function transformJsxElement(
 }
 
 /**
- * Generates a static element with extracted props table
+ * Generates a static element with extracted props table and optional full element extraction
  */
 function generateStaticElement(
     node: ts.JsxElement | ts.JsxSelfClosingElement,
     tagName: string,
-    context: OptimizationContext
+    context: OptimizationContext,
+    extractFullElement = true
 ): TransformResult {
     const staticProps = extractPropsFromJsx(node, true);
     const children = extractStaticChildren(node, context);
@@ -128,11 +131,67 @@ function generateStaticElement(
         propsArg = ts.factory.createIdentifier("undefined");
     }
 
+    const elementCall = createStaticElementCall(tagName, propsArg, children);
+
+    // Check if we should extract the full static element to module level
+    if (extractFullElement && isCompletelyStatic(node, context)) {
+        const elementId = generateStaticElementId(tagName);
+        const staticElementInfo: StaticElementInfo = {
+            id: elementId,
+            tagName,
+            propsTableId: staticPropsTable?.id || '',
+            children,
+            element: elementCall
+        };
+
+        context.staticElements.set(elementId, staticElementInfo);
+
+        // Return a reference to the static element instead of the full call
+        return {
+            element: ts.factory.createIdentifier(elementId),
+            needsRuntimeImport: true,
+            staticPropsTable,
+            staticElement: staticElementInfo
+        };
+    }
+
     return {
-        element: createStaticElementCall(tagName, propsArg, children),
+        element: elementCall,
         needsRuntimeImport: true,
         staticPropsTable
     };
+}
+
+/**
+ * Checks if an element and all its children are completely static
+ */
+function isCompletelyStatic(
+    node: ts.JsxElement | ts.JsxSelfClosingElement,
+    context: OptimizationContext
+): boolean {
+    // Check if the element itself is static
+    const blockInfo = context.blockAnalyzer?.analyzeJsxElement(node);
+    if (!blockInfo?.isStatic) {
+        return false;
+    }
+
+    // Check if all children are static (already checked in blockInfo.isStatic, but let's be explicit)
+    if (ts.isJsxElement(node)) {
+        for (const child of node.children) {
+            if (ts.isJsxElement(child) || ts.isJsxSelfClosingElement(child)) {
+                if (!isCompletelyStatic(child, context)) {
+                    return false;
+                }
+            } else if (ts.isJsxExpression(child) && child.expression) {
+                // Any JSX expression makes it dynamic
+                if (!isStaticExpression(child.expression)) {
+                    return false;
+                }
+            }
+        }
+    }
+
+    return true;
 }
 
 /**
@@ -232,6 +291,13 @@ function extractStaticChildren(
                     childResult.staticPropsTable.props
                 );
             }
+            if (childResult.staticElement) {
+                // Store static element for child
+                context.staticElements.set(
+                    childResult.staticElement.id,
+                    childResult.staticElement
+                );
+            }
             children.push(childResult.element);
         }
     }
@@ -264,6 +330,12 @@ function extractOptimizedChildren(
                 context.staticPropsTables.set(
                     childResult.staticPropsTable.id,
                     childResult.staticPropsTable.props
+                );
+            }
+            if (childResult.staticElement) {
+                context.staticElements.set(
+                    childResult.staticElement.id,
+                    childResult.staticElement
                 );
             }
             children.push(childResult.element);

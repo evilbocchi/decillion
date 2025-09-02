@@ -3,17 +3,19 @@ local TS = require(game:GetService("ReplicatedStorage"):WaitForChild("rbxts_incl
 local createStaticElement = TS.import(script, game:GetService("ReplicatedStorage"), "rbxts_include", "node_modules", "@decillion", "runtime", "out").createStaticElement
 local React = TS.import(script, game:GetService("ReplicatedStorage"), "rbxts_include", "node_modules", "@rbxts", "react")
 local ReactRoblox = TS.import(script, game:GetService("ReplicatedStorage"), "rbxts_include", "node_modules", "@rbxts", "react-roblox")
-local STATIC_PROPS_TEXTLABEL_mrs9jq = {
+-- Static declarations - extracted from render functions for optimal performance
+local STATIC_PROPS_TEXTLABEL_uug9v5 = {
 	AnchorPoint = Vector2.new(0.5, 0.5),
 	BackgroundColor3 = Color3.new(1, 1, 1),
 	Position = UDim2.new(0.5, 0, 0.5, 0),
 	Size = UDim2.new(0, 200, 0, 200),
 	Text = "Hello, world!",
 }
+local STATIC_ELEMENT_TEXTLABEL_q04pc6 = createStaticElement("textlabel", STATIC_PROPS_TEXTLABEL_uug9v5)
 return {
 	react = React,
 	reactRoblox = ReactRoblox,
 	story = function()
-		return createStaticElement("textlabel", STATIC_PROPS_TEXTLABEL_mrs9jq)
+		return STATIC_ELEMENT_TEXTLABEL_q04pc6
 	end,
 }

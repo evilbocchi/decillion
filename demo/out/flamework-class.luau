@@ -5,9 +5,12 @@ local Reflect = TS.import(script, game:GetService("ReplicatedStorage"), "rbxts_i
 local Service = TS.import(script, game:GetService("ReplicatedStorage"), "rbxts_include", "node_modules", "@flamework", "core", "out").Service
 local ReactRoblox = TS.import(script, game:GetService("ReplicatedStorage"), "rbxts_include", "node_modules", "@rbxts", "react-roblox")
 local Workspace = TS.import(script, game:GetService("ReplicatedStorage"), "rbxts_include", "node_modules", "@rbxts", "services").Workspace
-local STATIC_PROPS_TEXTLABEL_3n1ovo = {
+-- Static declarations - extracted from render functions for optimal performance
+local STATIC_PROPS_TEXTLABEL_voyr0a = {
 	Text = "Static Element",
 }
+local STATIC_ELEMENT_TEXTLABEL_1xj9lx = createStaticElement("textlabel", STATIC_PROPS_TEXTLABEL_voyr0a)
+local STATIC_ELEMENT_FRAME_qb3b25 = createStaticElement("frame", nil, STATIC_ELEMENT_TEXTLABEL_1xj9lx)
 local FlameworkClass
 do
 	FlameworkClass = setmetatable({}, {
@@ -23,7 +26,7 @@ do
 	function FlameworkClass:constructor()
 	end
 	function FlameworkClass:createStaticElement()
-		return createStaticElement("frame", nil, createStaticElement("textlabel", STATIC_PROPS_TEXTLABEL_3n1ovo))
+		return STATIC_ELEMENT_FRAME_qb3b25
 	end
 	function FlameworkClass:onInit()
 		print("FlameworkClass initialized!")
