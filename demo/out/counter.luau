@@ -1,37 +1,35 @@
 -- Compiled with roblox-ts v3.0.0
 local TS = require(game:GetService("ReplicatedStorage"):WaitForChild("rbxts_include"):WaitForChild("RuntimeLib"))
-local _runtime = TS.import(script, game:GetService("ReplicatedStorage"), "rbxts_include", "node_modules", "@decillion", "runtime", "out")
-local createStaticElement = _runtime.createStaticElement
-local useMemoizedBlock = _runtime.useMemoizedBlock
+local createStaticElement = TS.import(script, game:GetService("ReplicatedStorage"), "rbxts_include", "node_modules", "@decillion", "runtime", "out").createStaticElement
 local _react = TS.import(script, game:GetService("ReplicatedStorage"), "rbxts_include", "node_modules", "@rbxts", "react")
 local React = _react
 local useState = _react.useState
 -- Static declarations - extracted from render functions for optimal performance
-local STATIC_PROPS_TEXTLABEL_yjpksx = {
+local STATIC_PROPS_TEXTLABEL_ppsop1 = {
 	Text = "Optimized Counter App",
 	TextColor3 = Color3.fromRGB(255, 255, 255),
 	BackgroundTransparency = 1,
 	Size = UDim2.new(1, 0, 1, 0),
 }
-local STATIC_PROPS_TEXTLABEL_pff9bj = {
+local STATIC_PROPS_TEXTLABEL_zv1gpn = {
 	Text = "Performance: Decillion Optimized",
 	TextColor3 = Color3.fromRGB(200, 200, 200),
 	BackgroundTransparency = 1,
 	Size = UDim2.new(1, 0, 1, 0),
 }
-local STATIC_PROPS_FRAME_fp92r6 = {
+local STATIC_PROPS_FRAME_e77wvz = {
 	BackgroundColor3 = Color3.fromRGB(50, 50, 50),
 	Size = UDim2.new(1, 0, 0, 50),
 }
-local STATIC_PROPS_FRAME_61zi8b = {
+local STATIC_PROPS_FRAME_lih2xs = {
 	Size = UDim2.new(1, 0, 0, 100),
 	Position = UDim2.new(0, 0, 0, 160),
 	BackgroundColor3 = Color3.fromRGB(60, 60, 60),
 }
-local STATIC_ELEMENT_TEXTLABEL_37nw8z = createStaticElement("textlabel", STATIC_PROPS_TEXTLABEL_yjpksx)
-local STATIC_ELEMENT_FRAME_w405oq = createStaticElement("frame", STATIC_PROPS_FRAME_fp92r6, STATIC_ELEMENT_TEXTLABEL_37nw8z)
-local STATIC_ELEMENT_TEXTLABEL_egp2jw = createStaticElement("textlabel", STATIC_PROPS_TEXTLABEL_pff9bj)
-local STATIC_ELEMENT_FRAME_xuxwic = createStaticElement("frame", STATIC_PROPS_FRAME_61zi8b, STATIC_ELEMENT_TEXTLABEL_egp2jw)
+local STATIC_ELEMENT_TEXTLABEL_sv1qcc = createStaticElement("textlabel", STATIC_PROPS_TEXTLABEL_ppsop1)
+local STATIC_ELEMENT_FRAME_bzwiit = createStaticElement("frame", STATIC_PROPS_FRAME_e77wvz, STATIC_ELEMENT_TEXTLABEL_sv1qcc)
+local STATIC_ELEMENT_TEXTLABEL_6zmdbn = createStaticElement("textlabel", STATIC_PROPS_TEXTLABEL_zv1gpn)
+local STATIC_ELEMENT_FRAME_ajqwv4 = createStaticElement("frame", STATIC_PROPS_FRAME_lih2xs, STATIC_ELEMENT_TEXTLABEL_6zmdbn)
 local function Counter()
 	local count, setCount = useState(0)
 	local increment = function()
@@ -40,42 +38,34 @@ local function Counter()
 	local decrement = function()
 		return setCount(count - 1)
 	end
-	return useMemoizedBlock(function(count, increment, decrement)
-		return React.createElement("frame", {
-			Size = UDim2.new(1, 0, 1, 0),
-			BackgroundColor3 = Color3.fromRGB(30, 30, 30),
-		}, STATIC_ELEMENT_FRAME_w405oq, useMemoizedBlock(function(count)
-			return React.createElement("textlabel", {
-				Text = `Count: {count}`,
-				TextColor3 = Color3.fromRGB(255, 255, 255),
-				BackgroundColor3 = Color3.fromRGB(100, 100, 100),
-				Size = UDim2.new(1, 0, 0, 40),
-				Position = UDim2.new(0, 0, 0, 60),
-			})
-		end, { count }, "dynamic_textlabel_lyc4ocvxh"), useMemoizedBlock(function(increment)
-			return React.createElement("textbutton", {
-				Text = "Increment",
-				TextColor3 = Color3.fromRGB(255, 255, 255),
-				BackgroundColor3 = Color3.fromRGB(0, 150, 0),
-				Size = UDim2.new(0.5, -5, 0, 40),
-				Position = UDim2.new(0, 0, 0, 110),
-				Event = {
-					MouseButton1Click = increment,
-				},
-			})
-		end, { increment }, "dynamic_textbutton_bcuwgz5u5"), useMemoizedBlock(function(decrement)
-			return React.createElement("textbutton", {
-				Text = "Decrement",
-				TextColor3 = Color3.fromRGB(255, 255, 255),
-				BackgroundColor3 = Color3.fromRGB(150, 0, 0),
-				Size = UDim2.new(0.5, -5, 0, 40),
-				Position = UDim2.new(0.5, 5, 0, 110),
-				Event = {
-					MouseButton1Click = decrement,
-				},
-			})
-		end, { decrement }, "dynamic_textbutton_zj3vy2fn7"), STATIC_ELEMENT_FRAME_xuxwic)
-	end, { count, increment, decrement }, "dynamic_frame_0m6q9p83e")
+	return React.createElement("frame", {
+		Size = UDim2.new(1, 0, 1, 0),
+		BackgroundColor3 = Color3.fromRGB(30, 30, 30),
+	}, STATIC_ELEMENT_FRAME_bzwiit, React.createElement("textlabel", {
+		Text = `Count: {count}`,
+		TextColor3 = Color3.fromRGB(255, 255, 255),
+		BackgroundColor3 = Color3.fromRGB(100, 100, 100),
+		Size = UDim2.new(1, 0, 0, 40),
+		Position = UDim2.new(0, 0, 0, 60),
+	}), React.createElement("textbutton", {
+		Text = "Increment",
+		TextColor3 = Color3.fromRGB(255, 255, 255),
+		BackgroundColor3 = Color3.fromRGB(0, 150, 0),
+		Size = UDim2.new(0.5, -5, 0, 40),
+		Position = UDim2.new(0, 0, 0, 110),
+		Event = {
+			MouseButton1Click = increment,
+		},
+	}), React.createElement("textbutton", {
+		Text = "Decrement",
+		TextColor3 = Color3.fromRGB(255, 255, 255),
+		BackgroundColor3 = Color3.fromRGB(150, 0, 0),
+		Size = UDim2.new(0.5, -5, 0, 40),
+		Position = UDim2.new(0.5, 5, 0, 110),
+		Event = {
+			MouseButton1Click = decrement,
+		},
+	}), STATIC_ELEMENT_FRAME_ajqwv4)
 end
 return {
 	default = Counter,

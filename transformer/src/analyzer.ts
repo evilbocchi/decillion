@@ -421,6 +421,20 @@ export class BlockAnalyzer {
             return false;
         }
 
+        // Only memoize if there are at least 2 dependencies or if it has complex children
+        // This avoids over-memoizing simple elements with just one dynamic prop
+        if (blockInfo.dependencies.length < 2 && !blockInfo.hasDynamicChildren) {
+            return false;
+        }
+
+        // Only memoize blocks that have multiple dynamic props or complex expressions
+        const complexityScore = blockInfo.dynamicProps.length + (blockInfo.hasDynamicChildren ? 2 : 0);
+        
+        // Require a minimum complexity threshold to justify memoization overhead
+        if (complexityScore < 3) {
+            return false;
+        }
+
         // Memoize if it has dynamic props or children and has dependencies
         if ((blockInfo.dynamicProps.length > 0 || blockInfo.hasDynamicChildren) && blockInfo.dependencies.length > 0) {
             return true;
