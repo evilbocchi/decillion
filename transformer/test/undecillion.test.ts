@@ -36,7 +36,7 @@ function TestComponent() {
         const functionNode = findFunctionInFile(sourceFile);
 
         expect(functionNode).toBeTruthy();
-        expect(hasUndecillionDecorator(functionNode!)).toBe(true);
+        expect(hasUndecillionDecorator(functionNode!, sourceFile)).toBe(true);
     });
 
     it("should detect @undecillion comment before arrow function", () => {
@@ -50,7 +50,7 @@ const TestComponent = () => {
         const functionNode = findFunctionInFile(sourceFile);
 
         expect(functionNode).toBeTruthy();
-        expect(hasUndecillionDecorator(functionNode!)).toBe(true);
+        expect(hasUndecillionDecorator(functionNode!, sourceFile)).toBe(true);
     });
 
     it("should detect @undecillion in JSDoc comment", () => {
@@ -67,7 +67,50 @@ function TestComponent() {
         const functionNode = findFunctionInFile(sourceFile);
 
         expect(functionNode).toBeTruthy();
-        expect(hasUndecillionDecorator(functionNode!)).toBe(true);
+        expect(hasUndecillionDecorator(functionNode!, sourceFile)).toBe(true);
+    });
+
+    it("should detect @undecillion with exact demo format - TraditionalListItem", () => {
+        const code = `
+// Traditional React approach (for comparison) - skipped by @undecillion
+// @undecillion
+function TraditionalListItem({ id, name, value, isActive }: ListItemProps) {
+    return (
+        <frame
+            Size={new UDim2(1, 0, 0, 40)}
+            BackgroundColor3={isActive ? Color3.fromRGB(100, 150, 100) : Color3.fromRGB(80, 80, 80)}
+        >
+            <textlabel Text={\`\${name}: \${value}\`} />
+        </frame>
+    );
+}`;
+
+        const sourceFile = createSourceFile(code);
+        const functionNode = findFunctionInFile(sourceFile);
+
+        expect(functionNode).toBeTruthy();
+        expect(hasUndecillionDecorator(functionNode!, sourceFile)).toBe(true);
+    });
+
+    it("should detect @undecillion with exact demo format - DocumentedSkippedComponent", () => {
+        const code = `
+/**
+ * @undecillion
+ * This component will not be optimized by Decillion
+ */
+function DocumentedSkippedComponent() {
+    return (
+        <frame Size={new UDim2(1, 0, 0, 50)}>
+            <textlabel Text="This won't be optimized" />
+        </frame>
+    );
+}`;
+
+        const sourceFile = createSourceFile(code);
+        const functionNode = findFunctionInFile(sourceFile);
+
+        expect(functionNode).toBeTruthy();
+        expect(hasUndecillionDecorator(functionNode!, sourceFile)).toBe(true);
     });
 
     it("should not detect @undecillion when not present", () => {
@@ -80,7 +123,7 @@ function TestComponent() {
         const functionNode = findFunctionInFile(sourceFile);
 
         expect(functionNode).toBeTruthy();
-        expect(hasUndecillionDecorator(functionNode!)).toBe(false);
+        expect(hasUndecillionDecorator(functionNode!, sourceFile)).toBe(false);
     });
 
     it("should not detect @undecillion in distant comments", () => {
@@ -97,7 +140,7 @@ function TestComponent() {
         const functionNode = findFunctionInFile(sourceFile);
 
         expect(functionNode).toBeTruthy();
-        expect(hasUndecillionDecorator(functionNode!)).toBe(false);
+        expect(hasUndecillionDecorator(functionNode!, sourceFile)).toBe(false);
     });
 
     it("should get function name from function declaration", () => {

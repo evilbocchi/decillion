@@ -59,14 +59,20 @@ export default function (program: ts.Program, options: DecillionTransformerOptio
                     ts.isArrowFunction(node) ||
                     ts.isMethodDeclaration(node)
                 ) {
-                    if (hasUndecillionDecorator(node)) {
-                        const functionName = getFunctionName(node);
+                    const functionName = getFunctionName(node);
+                    if (debug && functionName) {
+                        console.log(`Scanning function: ${functionName}`);
+                    }
+                    
+                    if (hasUndecillionDecorator(node, file)) {
                         if (functionName) {
                             optimizationContext.skipTransformFunctions.add(functionName);
                             if (debug) {
                                 console.log(`Found @undecillion decorator on function: ${functionName}`);
                             }
                         }
+                    } else if (debug && functionName) {
+                        console.log(`No @undecillion decorator found on function: ${functionName}`);
                     }
                 }
 
@@ -109,7 +115,7 @@ export default function (program: ts.Program, options: DecillionTransformerOptio
                     if (shouldSkipTransformation(optimizationContext)) {
                         if (debug) {
                             console.log(
-                                `Skipping JSX transformation due to @undecillion decorator: ${getTagName(node)}`,
+                                `Skipping JSX transformation due to @undecillion decorator: ${getTagName(node)} (current function context: ${optimizationContext.functionContextStack.join(" -> ")})`,
                             );
                         }
                         // Return the original JSX node without transformation
@@ -117,7 +123,9 @@ export default function (program: ts.Program, options: DecillionTransformerOptio
                     }
 
                     if (debug) {
-                        console.log(`Found JSX element: ${getTagName(node)}`);
+                        console.log(
+                            `Found JSX element: ${getTagName(node)} (current function context: ${optimizationContext.functionContextStack.join(" -> ")})`,
+                        );
                     }
 
                     needsRuntimeImport = true;

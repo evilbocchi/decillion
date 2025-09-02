@@ -1,20 +1,9 @@
 -- Compiled with roblox-ts v3.0.0
 local TS = require(game:GetService("ReplicatedStorage"):WaitForChild("rbxts_include"):WaitForChild("RuntimeLib"))
-local _runtime = TS.import(script, game:GetService("ReplicatedStorage"), "rbxts_include", "node_modules", "@decillion", "runtime", "out")
-local createStaticElement = _runtime.createStaticElement
-local useMemoizedBlock = _runtime.useMemoizedBlock
+local useMemoizedBlock = TS.import(script, game:GetService("ReplicatedStorage"), "rbxts_include", "node_modules", "@decillion", "runtime", "out").useMemoizedBlock
 local _react = TS.import(script, game:GetService("ReplicatedStorage"), "rbxts_include", "node_modules", "@rbxts", "react")
 local React = _react
 local useState = _react.useState
--- Static declarations - extracted from render functions for optimal performance
-local STATIC_PROPS_TEXTLABEL_iyamqt = {
-	Text = "This won't be optimized",
-}
-local STATIC_PROPS_FRAME_9p19p7 = {
-	Size = UDim2.new(1, 0, 0, 50),
-}
-local STATIC_ELEMENT_TEXTLABEL_9qpe5b = createStaticElement("textlabel", STATIC_PROPS_TEXTLABEL_iyamqt)
-local STATIC_ELEMENT_FRAME_ndqcii = createStaticElement("frame", STATIC_PROPS_FRAME_9p19p7, STATIC_ELEMENT_TEXTLABEL_9qpe5b)
 --[[
 	*
 	 * Benchmark: Massive List Rendering
@@ -28,27 +17,21 @@ local function TraditionalListItem(_param)
 	local name = _param.name
 	local value = _param.value
 	local isActive = _param.isActive
-	return useMemoizedBlock(function(isActive, name, value, id)
-		return React.createElement("frame", {
-			Size = UDim2.new(1, 0, 0, 40),
-			BackgroundColor3 = if isActive then Color3.fromRGB(100, 150, 100) else Color3.fromRGB(80, 80, 80),
-		}, useMemoizedBlock(function(name, value)
-			return React.createElement("textlabel", {
-				Text = `{name}: {value}`,
-				Size = UDim2.new(0.8, 0, 1, 0),
-				TextColor3 = Color3.fromRGB(255, 255, 255),
-				BackgroundTransparency = 1,
-			})
-		end, { name, value }, "dynamic_textlabel_tg7y356sv"), useMemoizedBlock(function(id)
-			return React.createElement("textlabel", {
-				Text = `#{id}`,
-				Size = UDim2.new(0.2, 0, 1, 0),
-				Position = UDim2.new(0.8, 0, 0, 0),
-				TextColor3 = Color3.fromRGB(200, 200, 200),
-				BackgroundTransparency = 1,
-			})
-		end, { id }, "dynamic_textlabel_lkw0fti67"))
-	end, { isActive, name, value, id }, "dynamic_frame_h1qstn6bt")
+	return React.createElement("frame", {
+		Size = UDim2.new(1, 0, 0, 40),
+		BackgroundColor3 = if isActive then Color3.fromRGB(100, 150, 100) else Color3.fromRGB(80, 80, 80),
+	}, React.createElement("textlabel", {
+		Text = `{name}: {value}`,
+		Size = UDim2.new(0.8, 0, 1, 0),
+		TextColor3 = Color3.fromRGB(255, 255, 255),
+		BackgroundTransparency = 1,
+	}), React.createElement("textlabel", {
+		Text = `#{id}`,
+		Size = UDim2.new(0.2, 0, 1, 0),
+		Position = UDim2.new(0.8, 0, 0, 0),
+		TextColor3 = Color3.fromRGB(200, 200, 200),
+		BackgroundTransparency = 1,
+	}))
 end
 -- Optimized Decillion approach
 local function OptimizedListItem(_param)
@@ -67,7 +50,7 @@ local function OptimizedListItem(_param)
 				TextColor3 = Color3.fromRGB(255, 255, 255),
 				BackgroundTransparency = 1,
 			})
-		end, { name, value }, "dynamic_textlabel_6nlzw22wl"), useMemoizedBlock(function(id)
+		end, { name, value }, "dynamic_textlabel_tdnqpd3r4"), useMemoizedBlock(function(id)
 			return React.createElement("textlabel", {
 				Text = `#{id}`,
 				Size = UDim2.new(0.2, 0, 1, 0),
@@ -75,8 +58,8 @@ local function OptimizedListItem(_param)
 				TextColor3 = Color3.fromRGB(200, 200, 200),
 				BackgroundTransparency = 1,
 			})
-		end, { id }, "dynamic_textlabel_ndpa5992v"))
-	end, { isActive, name, value, id }, "dynamic_frame_k1irmfviz")
+		end, { id }, "dynamic_textlabel_cy0wn2cqx"))
+	end, { isActive, name, value, id }, "dynamic_frame_qp64dhmv6")
 end
 local function MassiveListBenchmark()
 	local itemCount, setItemCount = useState(100)
@@ -131,7 +114,7 @@ local function MassiveListBenchmark()
 					TextColor3 = Color3.fromRGB(255, 255, 255),
 					BackgroundTransparency = 1,
 				})
-			end, { itemCount }, "dynamic_textlabel_ggwnazdn6"), useMemoizedBlock(function(useOptimized)
+			end, { itemCount }, "dynamic_textlabel_1afdd3a6o"), useMemoizedBlock(function(useOptimized)
 				return React.createElement("textbutton", {
 					Text = if useOptimized then "Using Optimized" else "Using Traditional",
 					Size = UDim2.new(0.3, 0, 0, 30),
@@ -144,7 +127,7 @@ local function MassiveListBenchmark()
 						end,
 					},
 				})
-			end, { useOptimized }, "dynamic_textbutton_7a6lofst7"), useMemoizedBlock(function(triggerUpdate)
+			end, { useOptimized }, "dynamic_textbutton_urqccapfo"), useMemoizedBlock(function(triggerUpdate)
 				return React.createElement("textbutton", {
 					Text = "Trigger Re-render",
 					Size = UDim2.new(0.3, 0, 0, 30),
@@ -155,7 +138,7 @@ local function MassiveListBenchmark()
 						MouseButton1Click = triggerUpdate,
 					},
 				})
-			end, { triggerUpdate }, "dynamic_textbutton_2ehz3ur0a"), useMemoizedBlock(function(renderTime)
+			end, { triggerUpdate }, "dynamic_textbutton_0s0kbh7ep"), useMemoizedBlock(function(renderTime)
 				return React.createElement("textlabel", {
 					Text = `Last Render: {string.format("%.3f", renderTime)}ms`,
 					Size = UDim2.new(0.3, 0, 0, 30),
@@ -163,7 +146,7 @@ local function MassiveListBenchmark()
 					TextColor3 = Color3.fromRGB(200, 200, 200),
 					BackgroundTransparency = 1,
 				})
-			end, { renderTime }, "dynamic_textlabel_rxw5x6928"), useMemoizedBlock(function(itemCount)
+			end, { renderTime }, "dynamic_textlabel_vicvde8z5"), useMemoizedBlock(function(itemCount)
 				return React.createElement("textlabel", {
 					Text = `Items: {itemCount}`,
 					Size = UDim2.new(0.5, 0, 0, 30),
@@ -171,8 +154,8 @@ local function MassiveListBenchmark()
 					TextColor3 = Color3.fromRGB(200, 200, 200),
 					BackgroundTransparency = 1,
 				})
-			end, { itemCount }, "dynamic_textlabel_9eygs39zx"))
-		end, { itemCount, useOptimized, triggerUpdate, renderTime }, "dynamic_frame_gmrfmiec0"), useMemoizedBlock(function(itemCount, items, ListComponent)
+			end, { itemCount }, "dynamic_textlabel_d83uhh52h"))
+		end, { itemCount, useOptimized, triggerUpdate, renderTime }, "dynamic_frame_dv7qolkjw"), useMemoizedBlock(function(itemCount, items, ListComponent)
 			local _exp = {
 				Size = UDim2.new(1, 0, 1, -100),
 				Position = UDim2.new(0, 0, 0, 100),
@@ -200,8 +183,8 @@ local function MassiveListBenchmark()
 			end
 			-- ▲ ReadonlyArray.map ▲
 			return React.createElement("scrollingframe", _exp, _exp_1, _newValue)
-		end, { itemCount, items, ListComponent }, "dynamic_scrollingframe_uevgvp45x"))
-	end, { itemCount, useOptimized, triggerUpdate, renderTime, items, ListComponent }, "dynamic_frame_6cua154ew")
+		end, { itemCount, items, ListComponent }, "dynamic_scrollingframe_vetyg1a8u"))
+	end, { itemCount, useOptimized, triggerUpdate, renderTime, items, ListComponent }, "dynamic_frame_x592w38n0")
 end
 -- Alternative ways to use @undecillion
 -- Comment-style for arrow functions
@@ -215,7 +198,7 @@ local SkippedArrowComponent = function(_param)
 			BackgroundTransparency = 1,
 			TextColor3 = Color3.fromRGB(255, 255, 255),
 		})
-	end, { text }, "dynamic_textlabel_at0rt7bzq")
+	end, { text }, "dynamic_textlabel_phd7zdlbz")
 end
 -- JSDoc-style documentation
 --[[
@@ -225,7 +208,11 @@ end
 	 
 ]]
 local function DocumentedSkippedComponent()
-	return STATIC_ELEMENT_FRAME_ndqcii
+	return React.createElement("frame", {
+		Size = UDim2.new(1, 0, 0, 50),
+	}, React.createElement("textlabel", {
+		Text = "This won't be optimized",
+	}))
 end
 return {
 	default = MassiveListBenchmark,

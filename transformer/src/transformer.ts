@@ -573,25 +573,30 @@ function isStaticExpression(expr: ts.Expression): boolean {
  */
 export function hasUndecillionDecorator(
     node: ts.FunctionDeclaration | ts.FunctionExpression | ts.ArrowFunction | ts.MethodDeclaration,
+    sourceFile?: ts.SourceFile,
 ): boolean {
+    const functionName = getFunctionName(node);
+    const debug = true; // Enable debug for this function
+    
     // Get the source file and text
-    const sourceFile = node.getSourceFile();
-    if (!sourceFile) {
+    const file = sourceFile || node.getSourceFile();
+    if (!file) {
+        if (debug) console.log(`hasUndecillionDecorator(${functionName}): No source file`);
         return false;
     }
 
-    const fullText = sourceFile.getFullText();
+    const fullText = file.getFullText();
 
     // For arrow functions, we need to find the top-level statement that contains the comment
     let checkNode: ts.Node = node;
     if (ts.isArrowFunction(node)) {
         // Navigate up to find the VariableStatement which contains the leading comments
         let parent = node.parent;
-        if (ts.isVariableDeclaration(parent)) {
+        if (parent && ts.isVariableDeclaration(parent)) {
             parent = parent.parent; // VariableDeclarationList
-            if (ts.isVariableDeclarationList(parent)) {
+            if (parent && ts.isVariableDeclarationList(parent)) {
                 parent = parent.parent; // VariableStatement
-                if (ts.isVariableStatement(parent)) {
+                if (parent && ts.isVariableStatement(parent)) {
                     checkNode = parent;
                 }
             }
@@ -600,7 +605,7 @@ export function hasUndecillionDecorator(
 
     // Get the start position of the node (including leading trivia like comments)
     const nodeStart = checkNode.getFullStart();
-    const nodePos = checkNode.getStart(sourceFile);
+    const nodePos = checkNode.getStart(file);
 
     // Look for @undecillion in the text before the actual node start
     const textBeforeNode = fullText.substring(nodeStart, nodePos);
@@ -612,6 +617,10 @@ export function hasUndecillionDecorator(
     // Check if @undecillion appears in comments before the function
     const hasUndecillionMarker = contextText.includes("@undecillion") || textBeforeNode.includes("@undecillion");
 
+    if (debug && hasUndecillionMarker) {
+        console.log(`hasUndecillionDecorator(${functionName}): Found @undecillion marker in text`);
+    }
+
     if (hasUndecillionMarker) {
         // Ensure it's in a comment context, not just random text
         const lines = contextText.split("\n");
@@ -621,6 +630,10 @@ export function hasUndecillionDecorator(
 
             // Check if this line contains @undecillion in a comment context
             if (line.includes("@undecillion")) {
+                if (debug) {
+                    console.log(`hasUndecillionDecorator(${functionName}): Checking line: "${line}"`);
+                }
+                
                 // Verify it's in a comment (starts with //, /*, or is part of JSDoc)
                 if (
                     line.startsWith("//") ||
@@ -629,6 +642,9 @@ export function hasUndecillionDecorator(
                     line.includes("* @undecillion") ||
                     line.match(/^\s*@undecillion/)
                 ) {
+                    if (debug) {
+                        console.log(`hasUndecillionDecorator(${functionName}): Found valid @undecillion comment`);
+                    }
                     return true;
                 }
             }
@@ -645,6 +661,12 @@ export function hasUndecillionDecorator(
                 break;
             }
         }
+    }
+
+    if (debug && hasUndecillionMarker) {
+        console.log(
+            `hasUndecillionDecorator(${functionName}): Found @undecillion marker but not in valid comment context`,
+        );
     }
 
     return false;
