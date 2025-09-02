@@ -121,6 +121,10 @@ export class BlockAnalyzer {
 
         // Check for property access (obj.prop)
         if (ts.isPropertyAccessExpression(expr)) {
+            // Check if this is a static Roblox property first
+            if (robloxStaticDetector.isStaticRobloxProperty(expr)) {
+                return false;
+            }
             return true;
         }
 
@@ -200,6 +204,11 @@ export class BlockAnalyzer {
         }
 
         if (ts.isPropertyAccessExpression(expr)) {
+            // Check if this is a static Roblox property first
+            if (robloxStaticDetector.isStaticRobloxProperty(expr)) {
+                // Don't extract dependencies from static Roblox properties
+                return;
+            }
             this.extractDependencies(expr.expression, deps);
             return;
         }
