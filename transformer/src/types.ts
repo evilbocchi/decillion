@@ -5,6 +5,12 @@ import type { BlockAnalyzer } from "./analyzer";
  * Core types for block analysis and transformation
  */
 
+export interface DependencyInfo {
+    name: string;
+    type?: ts.TypeNode;
+    sourceNode?: ts.Node; // The original node where this dependency was found
+}
+
 export interface BlockInfo {
     id: string;
     staticProps: string[];
@@ -12,6 +18,7 @@ export interface BlockInfo {
     hasDynamicChildren: boolean;
     isStatic: boolean;
     dependencies: string[];
+    dependencyTypes?: Map<string, DependencyInfo>; // Enhanced dependency tracking with types
 }
 
 export interface PropInfo {

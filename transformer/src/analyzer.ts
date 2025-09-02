@@ -1,5 +1,6 @@
 import * as ts from "typescript";
 import { robloxStaticDetector } from "./roblox-static-detector";
+import type { DependencyInfo } from "./types";
 
 export interface BlockInfo {
     id: string;
@@ -8,6 +9,7 @@ export interface BlockInfo {
     hasDynamicChildren: boolean;
     isStatic: boolean;
     dependencies: string[];
+    dependencyTypes?: Map<string, DependencyInfo>; // Enhanced dependency tracking with types
 }
 
 /**
@@ -47,7 +49,8 @@ export class BlockAnalyzer {
             dynamicProps: [],
             hasDynamicChildren: false,
             isStatic: true,
-            dependencies: []
+            dependencies: [],
+            dependencyTypes: new Map()
         };
 
         // React components (PascalCase) should never be treated as static
@@ -69,7 +72,7 @@ export class BlockAnalyzer {
                     if (this.isDynamicExpression(attr.initializer.expression)) {
                         blockInfo.dynamicProps.push(propName);
                         blockInfo.isStatic = false;
-                        this.extractDependencies(attr.initializer.expression, blockInfo.dependencies);
+                        this.extractDependencies(attr.initializer.expression, blockInfo.dependencies, blockInfo.dependencyTypes);
                     } else {
                         blockInfo.staticProps.push(propName);
                     }
@@ -98,7 +101,7 @@ export class BlockAnalyzer {
                     if (this.isDynamicExpression(child.expression)) {
                         blockInfo.hasDynamicChildren = true;
                         blockInfo.isStatic = false;
-                        this.extractDependencies(child.expression, blockInfo.dependencies);
+                        this.extractDependencies(child.expression, blockInfo.dependencies, blockInfo.dependencyTypes);
                     }
                 }
             }
@@ -196,11 +199,21 @@ export class BlockAnalyzer {
     }
 
     /**
-     * Extracts variable dependencies from an expression
+     * Extracts variable dependencies from an expression with type information
      */
-    private extractDependencies(expr: ts.Expression, deps: string[]): void {
+    private extractDependencies(expr: ts.Expression, deps: string[], depTypes?: Map<string, DependencyInfo>): void {
         if (ts.isIdentifier(expr)) {
             deps.push(expr.text);
+            if (depTypes) {
+                // Try to get the type of this identifier
+                const type = this.typeChecker.getTypeAtLocation(expr);
+                const typeNode = this.typeChecker.typeToTypeNode(type, expr, ts.NodeBuilderFlags.InTypeAlias);
+                depTypes.set(expr.text, {
+                    name: expr.text,
+                    type: typeNode,
+                    sourceNode: expr
+                });
+            }
             return;
         }
 
@@ -210,14 +223,14 @@ export class BlockAnalyzer {
                 // Don't extract dependencies from static Roblox properties
                 return;
             }
-            this.extractDependencies(expr.expression, deps);
+            this.extractDependencies(expr.expression, deps, depTypes);
             return;
         }
 
         if (ts.isElementAccessExpression(expr)) {
-            this.extractDependencies(expr.expression, deps);
+            this.extractDependencies(expr.expression, deps, depTypes);
             if (ts.isExpression(expr.argumentExpression)) {
-                this.extractDependencies(expr.argumentExpression, deps);
+                this.extractDependencies(expr.argumentExpression, deps, depTypes);
             }
             return;
         }
@@ -229,17 +242,17 @@ export class BlockAnalyzer {
                 // Only extract dependencies from arguments, not the constructor itself
                 expr.arguments.forEach(arg => {
                     if (ts.isExpression(arg)) {
-                        this.extractDependencies(arg, deps);
+                        this.extractDependencies(arg, deps, depTypes);
                     }
                 });
                 return;
             }
 
             // For other call expressions, extract from both the function and arguments
-            this.extractDependencies(expr.expression, deps);
+            this.extractDependencies(expr.expression, deps, depTypes);
             expr.arguments.forEach(arg => {
                 if (ts.isExpression(arg)) {
-                    this.extractDependencies(arg, deps);
+                    this.extractDependencies(arg, deps, depTypes);
                 }
             });
             return;
@@ -253,18 +266,18 @@ export class BlockAnalyzer {
                 if (expr.arguments) {
                     expr.arguments.forEach(arg => {
                         if (ts.isExpression(arg)) {
-                            this.extractDependencies(arg, deps);
+                            this.extractDependencies(arg, deps, depTypes);
                         }
                     });
                 }
                 return;
             }
             // For other new expressions, extract dependencies normally
-            this.extractDependencies(expr.expression, deps);
+            this.extractDependencies(expr.expression, deps, depTypes);
             if (expr.arguments) {
                 expr.arguments.forEach(arg => {
                     if (ts.isExpression(arg)) {
-                        this.extractDependencies(arg, deps);
+                        this.extractDependencies(arg, deps, depTypes);
                     }
                 });
             }
@@ -273,36 +286,45 @@ export class BlockAnalyzer {
 
         if (ts.isTemplateExpression(expr)) {
             expr.templateSpans.forEach(span =>
-                this.extractDependencies(span.expression, deps)
+                this.extractDependencies(span.expression, deps, depTypes)
             );
             return;
         }
 
         if (ts.isBinaryExpression(expr)) {
-            this.extractDependencies(expr.left, deps);
-            this.extractDependencies(expr.right, deps);
+            this.extractDependencies(expr.left, deps, depTypes);
+            this.extractDependencies(expr.right, deps, depTypes);
             return;
         }
 
         if (ts.isConditionalExpression(expr)) {
-            this.extractDependencies(expr.condition, deps);
-            this.extractDependencies(expr.whenTrue, deps);
-            this.extractDependencies(expr.whenFalse, deps);
+            this.extractDependencies(expr.condition, deps, depTypes);
+            this.extractDependencies(expr.whenTrue, deps, depTypes);
+            this.extractDependencies(expr.whenFalse, deps, depTypes);
             return;
         }
 
         if (ts.isObjectLiteralExpression(expr)) {
             expr.properties.forEach(prop => {
                 if (ts.isPropertyAssignment(prop)) {
-                    this.extractDependencies(prop.initializer, deps);
+                    this.extractDependencies(prop.initializer, deps, depTypes);
                 } else if (ts.isShorthandPropertyAssignment(prop)) {
                     // For shorthand properties like { increment }, the identifier is the value
                     deps.push(prop.name.text);
+                    if (depTypes) {
+                        const type = this.typeChecker.getTypeAtLocation(prop.name);
+                        const typeNode = this.typeChecker.typeToTypeNode(type, prop.name, ts.NodeBuilderFlags.InTypeAlias);
+                        depTypes.set(prop.name.text, {
+                            name: prop.name.text,
+                            type: typeNode,
+                            sourceNode: prop.name
+                        });
+                    }
                 } else if (ts.isMethodDeclaration(prop)) {
                     // Method declarations might contain dependencies in their body
                     ts.forEachChild(prop, child => {
                         if (ts.isExpression(child)) {
-                            this.extractDependencies(child, deps);
+                            this.extractDependencies(child, deps, depTypes);
                         }
                     });
                 }
@@ -313,7 +335,7 @@ export class BlockAnalyzer {
         if (ts.isArrayLiteralExpression(expr)) {
             expr.elements.forEach(el => {
                 if (ts.isExpression(el)) {
-                    this.extractDependencies(el, deps);
+                    this.extractDependencies(el, deps, depTypes);
                 }
             });
             return;
@@ -322,7 +344,7 @@ export class BlockAnalyzer {
         // Handle other expression types as needed
         ts.forEachChild(expr, child => {
             if (ts.isExpression(child)) {
-                this.extractDependencies(child, deps);
+                this.extractDependencies(child, deps, depTypes);
             }
         });
     }

@@ -1,7 +1,6 @@
 import * as ts from "typescript";
 import type { BlockInfo } from "./analyzer";
 import {
-    createMemoizedArrowFunction,
     createMemoizedBlockCall,
     createPropsObject,
     createStaticElementCall,
@@ -26,6 +25,70 @@ function createTagReference(tagName: string): ts.Expression {
         // HTML-like element - use string literal
         return ts.factory.createStringLiteral(tagName);
     }
+}
+
+/**
+ * Utility function to fetch parameter types for a memoized block
+ * This can be used externally to get type information for dependencies
+ */
+export function getBlockParameterTypes(
+    blockInfo: BlockInfo,
+    context: OptimizationContext
+): Array<{ name: string; type: ts.TypeNode | undefined; sourceNode?: ts.Node }> {
+    const parameterTypes: Array<{ name: string; type: ts.TypeNode | undefined; sourceNode?: ts.Node }> = [];
+
+    for (const dep of blockInfo.dependencies) {
+        let typeNode: ts.TypeNode | undefined;
+        let sourceNode: ts.Node | undefined;
+
+        // Try to get type information from the dependency types map
+        if (blockInfo.dependencyTypes?.has(dep)) {
+            const depInfo = blockInfo.dependencyTypes.get(dep)!;
+            typeNode = depInfo.type;
+            sourceNode = depInfo.sourceNode;
+        }
+
+        // If we couldn't get a specific type, try to infer it from context
+        if (!typeNode && context.typeChecker) {
+            // Try to find the identifier in the current scope and get its type
+            // This is a fallback for when the dependency analysis didn't capture the type
+            const symbol = context.typeChecker.getSymbolAtLocation(ts.factory.createIdentifier(dep));
+            if (symbol) {
+                const type = context.typeChecker.getTypeOfSymbolAtLocation(symbol, symbol.valueDeclaration || symbol.declarations?.[0]!);
+                typeNode = context.typeChecker.typeToTypeNode(type, symbol.valueDeclaration || symbol.declarations?.[0]!, ts.NodeBuilderFlags.InTypeAlias);
+            }
+        }
+
+        parameterTypes.push({
+            name: dep,
+            type: typeNode,
+            sourceNode
+        });
+    }
+
+    return parameterTypes;
+}
+
+/**
+ * Utility function to get a human-readable string representation of parameter types
+ */
+export function getParameterTypesString(
+    blockInfo: BlockInfo,
+    context: OptimizationContext
+): string {
+    const paramTypes = getBlockParameterTypes(blockInfo, context);
+    
+    return paramTypes.map(param => {
+        if (param.type) {
+            const printer = ts.createPrinter();
+            // Create a temporary source file for printing
+            const tempSourceFile = ts.createSourceFile("temp.ts", "", ts.ScriptTarget.Latest);
+            const typeString = printer.printNode(ts.EmitHint.Unspecified, param.type, tempSourceFile);
+            return `${param.name}: ${typeString}`;
+        } else {
+            return `${param.name}: any`;
+        }
+    }).join(', ');
 }
 
 /**
@@ -92,7 +155,7 @@ export function transformJsxElement(
         context.context,
         context.blockAnalyzer
     );
-    
+
     const blockInfo = transformer.analyzeJsxElement(node);
     const tagName = context.blockAnalyzer!.getJsxTagName(node);
 
@@ -221,7 +284,45 @@ function generateMemoizedBlock(
         ]
     );
 
-    const arrowFunction = createMemoizedArrowFunction(blockInfo.dependencies, createElementCall);
+    const parameters = new Array<ts.ParameterDeclaration>();
+    for (const dep of blockInfo.dependencies) {
+        let typeNode: ts.TypeNode | undefined;
+
+        // Try to get type information from the dependency types map
+        if (blockInfo.dependencyTypes?.has(dep)) {
+            const depInfo = blockInfo.dependencyTypes.get(dep)!;
+            typeNode = depInfo.type;
+        }
+
+        // If we couldn't get a specific type, try to infer it from context
+        if (!typeNode && context.typeChecker) {
+            // Try to find the identifier in the current scope and get its type
+            // This is a fallback for when the dependency analysis didn't capture the type
+            const symbol = context.typeChecker.getSymbolAtLocation(ts.factory.createIdentifier(dep));
+            if (symbol) {
+                const type = context.typeChecker.getTypeOfSymbolAtLocation(symbol, node);
+                typeNode = context.typeChecker.typeToTypeNode(type, node, ts.NodeBuilderFlags.InTypeAlias);
+            }
+        }
+
+        parameters.push(ts.factory.createParameterDeclaration(
+            undefined,
+            undefined,
+            ts.factory.createIdentifier(dep),
+            undefined,
+            typeNode,
+            undefined
+        ));
+    }
+
+    const arrowFunction = ts.factory.createArrowFunction(
+        undefined,
+        undefined,
+        parameters,
+        undefined,
+        ts.factory.createToken(ts.SyntaxKind.EqualsGreaterThanToken),
+        createElementCall
+    );
 
     return {
         element: createMemoizedBlockCall(arrowFunction, blockInfo.dependencies, blockId),
@@ -451,7 +552,7 @@ export function hasUndecillionDecorator(node: ts.FunctionDeclaration | ts.Functi
     }
 
     const fullText = sourceFile.getFullText();
-    
+
     // For arrow functions, we need to find the top-level statement that contains the comment
     let checkNode: ts.Node = node;
     if (ts.isArrowFunction(node)) {
@@ -467,45 +568,45 @@ export function hasUndecillionDecorator(node: ts.FunctionDeclaration | ts.Functi
             }
         }
     }
-    
+
     // Get the start position of the node (including leading trivia like comments)
     const nodeStart = checkNode.getFullStart();
     const nodePos = checkNode.getStart(sourceFile);
-    
+
     // Look for @undecillion in the text before the actual node start
     const textBeforeNode = fullText.substring(nodeStart, nodePos);
-    
+
     // Also check a reasonable amount of text before the full start
     const contextStart = Math.max(0, nodeStart - 500); // Look back up to 500 characters
     const contextText = fullText.substring(contextStart, nodePos);
-    
+
     // Check if @undecillion appears in comments before the function
     const hasUndecillionMarker = contextText.includes('@undecillion') || textBeforeNode.includes('@undecillion');
-    
+
     if (hasUndecillionMarker) {
         // Ensure it's in a comment context, not just random text
         const lines = contextText.split('\n');
-        
+
         for (let i = lines.length - 1; i >= 0; i--) {
             const line = lines[i].trim();
-            
+
             // Check if this line contains @undecillion in a comment context
             if (line.includes('@undecillion')) {
                 // Verify it's in a comment (starts with //, /*, or is part of JSDoc)
-                if (line.startsWith('//') || 
-                    line.startsWith('/*') || 
+                if (line.startsWith('//') ||
+                    line.startsWith('/*') ||
                     line.startsWith('*') ||
                     line.includes('* @undecillion') ||
                     line.match(/^\s*@undecillion/)) {
                     return true;
                 }
             }
-            
+
             // Stop searching if we hit actual code (non-comment, non-whitespace)
-            if (line && 
-                !line.startsWith('//') && 
-                !line.startsWith('/*') && 
-                !line.startsWith('*') && 
+            if (line &&
+                !line.startsWith('//') &&
+                !line.startsWith('/*') &&
+                !line.startsWith('*') &&
                 !line.startsWith('@') &&
                 !line.match(/^\s*$/)) {
                 break;
@@ -523,25 +624,25 @@ export function getFunctionName(node: ts.FunctionDeclaration | ts.FunctionExpres
     if (ts.isFunctionDeclaration(node) && node.name) {
         return node.name.text;
     }
-    
+
     if (ts.isMethodDeclaration(node) && ts.isIdentifier(node.name)) {
         return node.name.text;
     }
-    
+
     // For function expressions and arrow functions, try to get name from variable declaration
     if (!node.parent) {
         return undefined;
     }
-    
+
     const parent = node.parent;
     if (ts.isVariableDeclaration(parent) && ts.isIdentifier(parent.name)) {
         return parent.name.text;
     }
-    
+
     if (ts.isPropertyAssignment(parent) && ts.isIdentifier(parent.name)) {
         return parent.name.text;
     }
-    
+
     return undefined;
 }
 
@@ -549,7 +650,7 @@ export function getFunctionName(node: ts.FunctionDeclaration | ts.FunctionExpres
  * Checks if we're currently inside a function that should skip transformation
  */
 export function shouldSkipTransformation(context: OptimizationContext): boolean {
-    return context.functionContextStack.some(functionName => 
+    return context.functionContextStack.some(functionName =>
         context.skipTransformFunctions.has(functionName)
     );
 }
