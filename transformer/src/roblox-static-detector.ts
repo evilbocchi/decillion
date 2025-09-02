@@ -20,14 +20,18 @@ class RobloxStaticDetector {
     private visitedFiles = new Set<string>();
     private currentRbxtsVersion?: string;
     private cacheFilePath?: string;
+    private debugMode = false;
     // Store interfaces for later lookup
     private interfaceDeclarations = new Map<string, ts.InterfaceDeclaration>();
 
     /**
      * Initialize the detector by parsing roblox.d.ts and all referenced files
      */
-    initialize(program: ts.Program): void {
+    initialize(program: ts.Program, debug = false): void {
         if (this.initialized) return;
+
+        // Store debug mode for cache decisions
+        this.debugMode = debug;
 
         // Clear visited files cache for fresh initialization
         this.visitedFiles.clear();
@@ -37,10 +41,14 @@ class RobloxStaticDetector {
         this.currentRbxtsVersion = this.getRbxtsVersion(program);
         this.cacheFilePath = this.getCacheFilePath(program);
 
-        // Try to load from cache first
-        if (this.currentRbxtsVersion && this.loadFromCache()) {
+        // Try to load from cache first (skip if debug mode is enabled)
+        if (!debug && this.currentRbxtsVersion && this.loadFromCache()) {
             this.initialized = true;
             return;
+        }
+
+        if (debug) {
+            console.log('Skipping cache due to debug mode, parsing roblox.d.ts...');
         }
 
         const resolved = this.resolveRobloxDTs(program);
@@ -60,8 +68,12 @@ class RobloxStaticDetector {
         // Parse all referenced files
         this.parseReferencedFiles(robloxDTs);
 
-        // Save to cache
-        this.saveToCache();
+        // Save to cache (skip if debug mode is enabled)
+        if (!debug) {
+            this.saveToCache();
+        } else if (debug) {
+            console.log('RobloxStaticDetector: Skipping cache save due to debug mode');
+        }
 
         this.initialized = true;
     }
@@ -245,6 +257,28 @@ class RobloxStaticDetector {
     }
 
     /**
+     * Reset the detector state and optionally clear cache
+     * Useful for debugging or when you want to force a fresh parse
+     */
+    reset(clearCache = false): void {
+        this.staticConstructors.clear();
+        this.staticMethods.clear();
+        this.staticProperties.clear();
+        this.initialized = false;
+        this.visitedFiles.clear();
+        this.interfaceDeclarations.clear();
+
+        if (clearCache && this.cacheFilePath && fs.existsSync(this.cacheFilePath)) {
+            try {
+                fs.unlinkSync(this.cacheFilePath);
+                console.log('RobloxStaticDetector: Cache file cleared');
+            } catch (error) {
+                console.warn('Failed to clear cache file:', error);
+            }
+        }
+    }
+
+    /**
      * Parse all files referenced by triple-slash directives
      */
     private parseReferencedFiles(sourceFile: ts.SourceFile): void {
@@ -349,6 +383,9 @@ class RobloxStaticDetector {
                 const namespaceName = node.name.text;
                 if (namespaceName === 'Enum' && node.body && ts.isModuleBlock(node.body)) {
                     this.parseEnumNamespace(node.body);
+                } else if (node.body && ts.isModuleBlock(node.body)) {
+                    // Handle other namespaces like string, math, etc.
+                    this.parseGeneralNamespace(namespaceName, node.body);
                 }
             }
 
@@ -495,6 +532,35 @@ class RobloxStaticDetector {
                     this.staticProperties.set('Enum', new Set());
                 }
                 this.staticProperties.get('Enum')!.add(enumName);
+            }
+        }
+    }
+
+    /**
+     * Parse general namespace to find static functions and properties
+     */
+    private parseGeneralNamespace(namespaceName: string, moduleBody: ts.ModuleBlock): void {
+        for (const statement of moduleBody.statements) {
+            // Handle function declarations in namespaces
+            if (ts.isFunctionDeclaration(statement) && statement.name && ts.isIdentifier(statement.name)) {
+                const functionName = statement.name.text;
+                if (!this.staticMethods.has(namespaceName)) {
+                    this.staticMethods.set(namespaceName, new Set());
+                }
+                this.staticMethods.get(namespaceName)!.add(functionName);
+            }
+            
+            // Handle variable declarations that might be static properties
+            if (ts.isVariableStatement(statement)) {
+                for (const declaration of statement.declarationList.declarations) {
+                    if (ts.isVariableDeclaration(declaration) && declaration.name && ts.isIdentifier(declaration.name)) {
+                        const propertyName = declaration.name.text;
+                        if (!this.staticProperties.has(namespaceName)) {
+                            this.staticProperties.set(namespaceName, new Set());
+                        }
+                        this.staticProperties.get(namespaceName)!.add(propertyName);
+                    }
+                }
             }
         }
     }

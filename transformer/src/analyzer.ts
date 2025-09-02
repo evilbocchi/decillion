@@ -21,11 +21,12 @@ export class BlockAnalyzer {
     constructor(
         private typeChecker: ts.TypeChecker,
         private context: ts.TransformationContext,
-        private program?: ts.Program
+        private program?: ts.Program,
+        private debug = false
     ) {
         // Initialize the Roblox static detector
         if (program) {
-            robloxStaticDetector.initialize(program);
+            robloxStaticDetector.initialize(program, debug);
         }
     }
 

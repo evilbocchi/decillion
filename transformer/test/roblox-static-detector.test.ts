@@ -30,7 +30,7 @@ describe('RobloxStaticDetector', () => {
             getDefaultLibFileName: () => 'lib.d.ts'
         });
 
-        robloxStaticDetector.initialize(program);
+        robloxStaticDetector.initialize(program, true);
     });
 
     function createCallExpression(code: string): ts.CallExpression | undefined {
@@ -98,6 +98,12 @@ describe('RobloxStaticDetector', () => {
             const newExpression = createNewExpression('new Date()');
             expect(newExpression).toBeDefined();
             expect(robloxStaticDetector.isStaticRobloxNew(newExpression!)).toBe(false);
+        });
+
+        it('should detect string.format as static', () => {
+            const callExpression = createCallExpression('string.format("%.3f", 123.456)');
+            expect(callExpression).toBeDefined();
+            expect(robloxStaticDetector.isStaticRobloxCall(callExpression!)).toBe(true);
         });
     });
 });

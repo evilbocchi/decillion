@@ -39,7 +39,7 @@ export default function (program: ts.Program, options: DecillionTransformerOptio
             }
 
             // Initialize transformation context with the new architecture
-            const blockAnalyzer = new BlockAnalyzer(program.getTypeChecker(), context, program);
+            const blockAnalyzer = new BlockAnalyzer(program.getTypeChecker(), context, program, debug);
             const transformer = new DecillionTransformer(
                 program.getTypeChecker(),
                 context,
