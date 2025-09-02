@@ -67,12 +67,56 @@ class RobloxStaticDetector {
     }
 
     private resolveRobloxDTs(program: ts.Program): ts.ResolvedModuleFull | undefined {
-        return ts.resolveModuleName(
+        // First try the standard TypeScript module resolution
+        const standardResolve = ts.resolveModuleName(
             '@rbxts/types',
             program.getCurrentDirectory(),
             program.getCompilerOptions(),
             ts.sys
         ).resolvedModule;
+        
+        if (standardResolve) {
+            return standardResolve;
+        }
+
+        // Fallback: Try to find @rbxts/types manually
+        const currentDir = program.getCurrentDirectory();
+        const possiblePaths = [
+            path.join(currentDir, 'node_modules', '@rbxts', 'types', 'include', 'roblox.d.ts'),
+            path.join(currentDir, '..', 'node_modules', '@rbxts', 'types', 'include', 'roblox.d.ts'),
+            path.join(currentDir, 'node_modules', '@rbxts', 'types', 'index.d.ts'),
+            path.join(currentDir, '..', 'node_modules', '@rbxts', 'types', 'index.d.ts'),
+            path.join(currentDir, 'node_modules', '@rbxts', 'types', 'types.d.ts'),
+            path.join(currentDir, '..', 'node_modules', '@rbxts', 'types', 'types.d.ts'),
+        ];
+
+        for (const possiblePath of possiblePaths) {
+            if (fs.existsSync(possiblePath)) {
+                return {
+                    resolvedFileName: possiblePath,
+                    isExternalLibraryImport: true,
+                    extension: ts.Extension.Dts
+                };
+            }
+        }
+
+        // If we still can't find it, try to find the main roblox.d.ts file
+        const robloxDtsPaths = [
+            path.join(currentDir, 'node_modules', '@rbxts', 'types', 'roblox.d.ts'),
+            path.join(currentDir, '..', 'node_modules', '@rbxts', 'types', 'roblox.d.ts'),
+        ];
+
+        for (const robloxDtsPath of robloxDtsPaths) {
+            if (fs.existsSync(robloxDtsPath)) {
+                return {
+                    resolvedFileName: robloxDtsPath,
+                    isExternalLibraryImport: true,
+                    extension: ts.Extension.Dts
+                };
+            }
+        }
+
+        return undefined;
     }
 
     /**
