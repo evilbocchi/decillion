@@ -8,14 +8,14 @@ local React = _react
 local useState = _react.useState
 local useEffect = _react.useEffect
 -- Static declarations - extracted from render functions for optimal performance
-local STATIC_PROPS_TEXTBUTTON_0p5a2d = {
+local STATIC_PROPS_TEXTBUTTON_xvu9b2 = {
 	Text = "Toggle First Item",
 	Size = UDim2.new(0.25, 0, 0, 25),
 	Position = UDim2.new(0.5, 0, 0, 30),
 	BackgroundColor3 = Color3.fromRGB(150, 100, 100),
 	TextColor3 = Color3.fromRGB(255, 255, 255),
 }
-local STATIC_PROPS_TEXTLABEL_8udli1 = {
+local STATIC_PROPS_TEXTLABEL_1v96ge = {
 	Text = "Click individual items to toggle them. Notice how Decillion only updates changed items.",
 	Size = UDim2.new(1, 0, 0, 50),
 	Position = UDim2.new(0, 0, 0, 60),
@@ -23,8 +23,8 @@ local STATIC_PROPS_TEXTLABEL_8udli1 = {
 	BackgroundTransparency = 1,
 	TextWrapped = true,
 }
-local STATIC_ELEMENT_TEXTBUTTON_mxpahh = createStaticElement("textbutton", STATIC_PROPS_TEXTBUTTON_0p5a2d)
-local STATIC_ELEMENT_TEXTLABEL_80soo6 = createStaticElement("textlabel", STATIC_PROPS_TEXTLABEL_8udli1)
+local STATIC_ELEMENT_TEXTBUTTON_995je9 = createStaticElement("textbutton", STATIC_PROPS_TEXTBUTTON_xvu9b2)
+local STATIC_ELEMENT_TEXTLABEL_wu7zte = createStaticElement("textlabel", STATIC_PROPS_TEXTLABEL_1v96ge)
 --[[
 	*
 	 * Advanced List Optimization Benchmark
@@ -59,7 +59,7 @@ local function TraditionalListItem(_param)
 				end,
 			},
 		}))
-	end, { isActive, name, value }, "dynamic_frame_id1857qte")
+	end, { isActive, name, value }, "dynamic_frame_h97dqb7cy")
 end
 -- Decillion optimized approach
 local function OptimizedListItem(_param)
@@ -89,7 +89,7 @@ local function OptimizedListItem(_param)
 				end,
 			},
 		}))
-	end, { isActive, name, value }, "dynamic_frame_1wbjy2mk5")
+	end, { isActive, name, value }, "dynamic_frame_mw530qa01")
 end
 local function OptimizedListBenchmark()
 	local itemCount, setItemCount = useState(100)
@@ -200,7 +200,7 @@ local function OptimizedListBenchmark()
 		Event = {
 			MouseButton1Click = triggerFullRerender,
 		},
-	}), STATIC_ELEMENT_TEXTBUTTON_mxpahh, React.createElement("textbutton", {
+	}), STATIC_ELEMENT_TEXTBUTTON_995je9, React.createElement("textbutton", {
 		Text = `Items: {itemCount}`,
 		Size = UDim2.new(0.25, 0, 0, 25),
 		Position = UDim2.new(0.75, 0, 0, 30),
@@ -211,7 +211,7 @@ local function OptimizedListBenchmark()
 				return setItemCount(if itemCount == 100 then 500 elseif itemCount == 500 then 1000 else 100)
 			end,
 		},
-	}), STATIC_ELEMENT_TEXTLABEL_80soo6), useMemoizedBlock(function(itemCount, items, ListComponent)
+	}), STATIC_ELEMENT_TEXTLABEL_wu7zte), useMemoizedBlock(function(itemCount, items, ListComponent)
 		local _exp = {
 			Size = UDim2.new(1, 0, 1, -120),
 			Position = UDim2.new(0, 0, 0, 120),
@@ -240,7 +240,7 @@ local function OptimizedListBenchmark()
 		end
 		-- ▲ ReadonlyArray.map ▲
 		return React.createElement("scrollingframe", _exp, _exp_1, _newValue)
-	end, { itemCount, items, ListComponent }, "dynamic_scrollingframe_ut7dj1fta"))
+	end, { itemCount, items, ListComponent }, "dynamic_scrollingframe_2t8lkrlmn"))
 end
 return {
 	default = OptimizedListBenchmark,

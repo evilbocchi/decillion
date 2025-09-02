@@ -8,7 +8,7 @@ import {
     generateStaticElementId,
     generateStaticPropsId,
 } from "./codegen";
-import { robloxStaticDetector } from "./roblox-static-detector";
+import { robloxStaticDetector } from "./roblox-bridge";
 import type { OptimizationContext, PropInfo, StaticElementInfo, TransformResult } from "./types";
 
 /**

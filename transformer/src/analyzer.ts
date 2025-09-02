@@ -1,5 +1,5 @@
 import * as ts from "typescript";
-import { robloxStaticDetector } from "./roblox-static-detector";
+import { robloxStaticDetector } from "./roblox-bridge";
 import type { DependencyInfo } from "./types";
 
 export interface BlockInfo {
@@ -429,7 +429,7 @@ export class BlockAnalyzer {
 
         // Only memoize blocks that have multiple dynamic props or complex expressions
         const complexityScore = blockInfo.dynamicProps.length + (blockInfo.hasDynamicChildren ? 2 : 0);
-        
+
         // Require a minimum complexity threshold to justify memoization overhead
         if (complexityScore < 3) {
             return false;

@@ -12,7 +12,7 @@ interface CacheData {
 /**
  * Cache for Roblox built-in detection to avoid re-parsing roblox.d.ts
  */
-class RobloxStaticDetector {
+class RobloxBridge {
     private staticConstructors = new Set<string>();
     private staticMethods = new Map<string, Set<string>>();
     private staticProperties = new Map<string, Set<string>>();
@@ -25,7 +25,7 @@ class RobloxStaticDetector {
     private interfaceDeclarations = new Map<string, ts.InterfaceDeclaration>();
 
     /**
-     * Initialize the detector by parsing roblox.d.ts and all referenced files
+     * Initialize the bridge by parsing roblox.d.ts and all referenced files
      */
     initialize(program: ts.Program, debug = false): void {
         if (this.initialized) return;
@@ -616,4 +616,4 @@ class RobloxStaticDetector {
 }
 
 // Create a singleton instance
-export const robloxStaticDetector = new RobloxStaticDetector();
+export const robloxStaticDetector = new RobloxBridge();

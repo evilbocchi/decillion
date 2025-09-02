@@ -7,14 +7,14 @@ local _react = TS.import(script, game:GetService("ReplicatedStorage"), "rbxts_in
 local React = _react
 local useState = _react.useState
 -- Static declarations - extracted from render functions for optimal performance
-local STATIC_PROPS_TEXTLABEL_em3s19 = {
+local STATIC_PROPS_TEXTLABEL_v53xua = {
 	Text = "Check console for render times. Optimized should be significantly faster!",
 	Size = UDim2.new(1, 0, 0, 20),
 	Position = UDim2.new(0, 0, 0, 55),
 	TextColor3 = Color3.fromRGB(200, 200, 200),
 	BackgroundTransparency = 1,
 }
-local STATIC_ELEMENT_TEXTLABEL_nvhp0q = createStaticElement("textlabel", STATIC_PROPS_TEXTLABEL_em3s19)
+local STATIC_ELEMENT_TEXTLABEL_3bmyd4 = createStaticElement("textlabel", STATIC_PROPS_TEXTLABEL_v53xua)
 --[[
 	*
 	 * Simple Performance Test: Shows the clear difference between optimized and unoptimized rendering
@@ -51,7 +51,7 @@ local function OptimizedItem(_param)
 			TextColor3 = Color3.fromRGB(255, 255, 255),
 			BackgroundTransparency = 1,
 		}))
-	end, { isHighlighted, text }, "dynamic_frame_o9xopuqkh")
+	end, { isHighlighted, text }, "dynamic_frame_naa0t64o9")
 end
 local function SimplePerformanceTest()
 	local itemCount, setItemCount = useState(500)
@@ -134,7 +134,7 @@ local function SimplePerformanceTest()
 				return setItemCount(if itemCount == 100 then 500 elseif itemCount == 500 then 1000 else 100)
 			end,
 		},
-	}), STATIC_ELEMENT_TEXTLABEL_nvhp0q), useMemoizedBlock(function(itemCount, items, ItemComponent)
+	}), STATIC_ELEMENT_TEXTLABEL_3bmyd4), useMemoizedBlock(function(itemCount, items, ItemComponent)
 		local _exp = {
 			Size = UDim2.new(1, 0, 1, -80),
 			Position = UDim2.new(0, 0, 0, 80),
@@ -161,7 +161,7 @@ local function SimplePerformanceTest()
 		end
 		-- ▲ ReadonlyArray.map ▲
 		return React.createElement("scrollingframe", _exp, _exp_1, _newValue)
-	end, { itemCount, items, ItemComponent }, "dynamic_scrollingframe_01vfarhju"))
+	end, { itemCount, items, ItemComponent }, "dynamic_scrollingframe_ko3hc3oyg"))
 end
 return {
 	default = SimplePerformanceTest,

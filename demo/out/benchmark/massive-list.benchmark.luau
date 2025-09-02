@@ -55,7 +55,7 @@ local function OptimizedListItem(_param)
 			TextColor3 = Color3.fromRGB(200, 200, 200),
 			BackgroundTransparency = 1,
 		}))
-	end, { isActive, name, value, id }, "dynamic_frame_46yhmcg7z")
+	end, { isActive, name, value, id }, "dynamic_frame_dk9zhdi1f")
 end
 local function MassiveListBenchmark()
 	local itemCount, setItemCount = useState(1000)
@@ -166,7 +166,7 @@ local function MassiveListBenchmark()
 		end
 		-- ▲ ReadonlyArray.map ▲
 		return React.createElement("scrollingframe", _exp, _exp_1, _newValue)
-	end, { itemCount, items, ListComponent }, "dynamic_scrollingframe_wvlcn2mqy"))
+	end, { itemCount, items, ListComponent }, "dynamic_scrollingframe_em72aoow9"))
 end
 -- Alternative ways to use @undecillion
 -- Comment-style for arrow functions

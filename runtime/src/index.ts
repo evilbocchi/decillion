@@ -1,6 +1,10 @@
 import React, { ReactElement, useRef } from "@rbxts/react";
 
+// We could use @rbxts/services too but this is fine for now
 const HttpService = game.GetService("HttpService");
+
+// https://github.com/jsdotlua/react-lua/blob/main/modules/shared/src/ReactSymbols.luau
+const REACT_ELEMENT_TYPE = 0xeac7;
 
 // Block instance cache
 const blockCache = new Map<string, BlockInstance>();
@@ -20,7 +24,7 @@ export interface BlockInstance {
 export function useMemoizedBlock<T extends unknown[]>(
     renderFn: (...deps: T) => ReactElement,
     dependencies: T,
-    blockId: string
+    blockId: string,
 ): ReactElement {
     const cached = blockCache.get(blockId);
     const prevDeps = dependencyCache.get(blockId) || [];
@@ -36,7 +40,7 @@ export function useMemoizedBlock<T extends unknown[]>(
             id: blockId,
             element: newElement,
             dependencies: [...dependencies],
-            lastRenderTime: tick()
+            lastRenderTime: tick(),
         };
 
         blockCache.set(blockId, blockInstance);
@@ -71,7 +75,7 @@ export function shouldUpdateBlock(prevDeps: unknown[], nextDeps: unknown[]): boo
  */
 export function createBlock<T extends unknown[]>(
     renderFn: (...deps: T) => ReactElement,
-    staticProps?: Record<string, unknown>
+    staticProps?: Record<string, unknown>,
 ): (...deps: T) => ReactElement {
     return (...dependencies: T) => {
         const blockId = generateBlockId(renderFn as (...args: unknown[]) => ReactElement, staticProps);
@@ -82,7 +86,10 @@ export function createBlock<T extends unknown[]>(
 /**
  * Generates a unique block ID based on the render function and static props
  */
-function generateBlockId(renderFn: (...args: unknown[]) => ReactElement, staticProps?: Record<string, unknown>): string {
+function generateBlockId(
+    renderFn: (...args: unknown[]) => ReactElement,
+    staticProps?: Record<string, unknown>,
+): string {
     // Create a hash based on function string and static props
     const fnString = tostring(renderFn);
     const propsString = staticProps ? HttpService.JSONEncode(staticProps) : "";
@@ -93,15 +100,45 @@ function generateBlockId(renderFn: (...args: unknown[]) => ReactElement, staticP
 }
 
 /**
- * Creates an optimized createElement that skips unnecessary prop processing for static elements
+ * Creates an optimized static element that bypasses React's createElement overhead
+ * This directly creates a ReactElement for truly static content that never changes
+ *
+ * IMPORTANT: This creates a properly formed React element that matches React Lua's
+ * expected structure, including the $$typeof symbol and _owner property
+ *
+ * @param elementType The type of the element AFTER processing e.g. (TextLabel, Frame, etc.)
+ * @param props The props for the element
+ * @param children The children for the element
+ * @returns A ReactElement representing the static element
  */
 export function createStaticElement(
     elementType: string,
     props: Record<string, unknown> | undefined,
     ...children: React.ReactNode[]
 ): ReactElement {
-    // For static elements, we can optimize by pre-processing props
-    return React.createElement(elementType, props, ...children);
+    // For static elements, we can bypass most of React.createElement's overhead
+    // since we know the props and children will never change
+
+    // Pre-process props once at compile time - no need for cloning, filtering, or merging
+    const staticProps = props !== undefined ? table.clone(props) : {};
+
+    // Pre-process children once - no need for varargs handling on every render
+    const childrenSize = children.size();
+    const staticChildren = childrenSize === 0 ? undefined : childrenSize === 1 ? children[0] : children;
+
+    if (staticChildren !== undefined) {
+        staticProps.children = staticChildren;
+    }
+
+    return {
+        // Built-in properties that belong on the element
+        type: elementType,
+        key: undefined,
+        ref: undefined,
+        props: staticProps,
+        // This tag allows React to uniquely identify this as a React Element
+        $$typeof: REACT_ELEMENT_TYPE,
+    } as ReactElement;
 }
 
 /**
@@ -131,16 +168,17 @@ export function getCacheStats(): {
         return {
             totalBlocks: 0,
             cacheHitRate: 0,
-            averageRenderTime: 0
+            averageRenderTime: 0,
         };
     }
 
-    const averageRenderTime = blocks.reduce((sum: number, block: BlockInstance) => sum + block.lastRenderTime, 0) / totalBlocks;
+    const averageRenderTime =
+        blocks.reduce((sum: number, block: BlockInstance) => sum + block.lastRenderTime, 0) / totalBlocks;
 
     return {
         totalBlocks,
         cacheHitRate: 0.95, // Placeholder - would need actual tracking
-        averageRenderTime
+        averageRenderTime,
     };
 }
 
@@ -149,7 +187,7 @@ export function getCacheStats(): {
  */
 export function useOptimizedComponent<P extends Record<string, unknown>>(
     Component: React.ComponentType<P>,
-    props: P
+    props: P,
 ): ReactElement<P> {
     // Simple memo implementation for Roblox-TS
     const elementRef = useRef<ReactElement<P>>();
