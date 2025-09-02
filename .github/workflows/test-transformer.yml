@@ -1,0 +1,56 @@
+name: Test Transformer
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'transformer/**'
+      - '.github/workflows/test-transformer.yml'
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'transformer/**'
+      - '.github/workflows/test-transformer.yml'
+
+jobs:
+  test-transformer:
+    name: Test Transformer Package
+    runs-on: ubuntu-latest
+    
+    strategy:
+      matrix:
+        node-version: [18.x, 20.x]
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Use Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: 'npm'
+          cache-dependency-path: transformer/package-lock.json
+          
+      - name: Install transformer dependencies
+        run: |
+          cd transformer
+          npm ci
+          
+      - name: Build transformer
+        run: |
+          cd transformer
+          npm run build
+          
+      - name: Run transformer tests
+        run: |
+          cd transformer
+          npm test
+          
+      - name: Upload coverage reports
+        if: matrix.node-version == '20.x' && hashFiles('transformer/coverage/**') != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: transformer-coverage
+          path: transformer/coverage/
+          retention-days: 7
