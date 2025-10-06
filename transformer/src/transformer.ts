@@ -40,10 +40,7 @@ function sanitizeDependencyType(
 
     if (ts.isTypeQueryNode(typeNode) && ts.isIdentifier(typeNode.exprName) && typeNode.exprName.text === dep) {
         return ts.factory.createTypeQueryNode(
-            ts.factory.createQualifiedName(
-                ts.factory.createIdentifier("globalThis"),
-                ts.factory.createIdentifier(dep),
-            ),
+            ts.factory.createQualifiedName(ts.factory.createIdentifier("globalThis"), ts.factory.createIdentifier(dep)),
         );
     }
 
@@ -71,13 +68,11 @@ function sanitizeDependencyType(
             if (context && referencedName === "VirtualListResult") {
                 context.requiredTypeImports.add("VirtualListResult");
 
-                const updatedArgs = typeNode.typeArguments
-                    ?.map((arg) => sanitizeDependencyType(dep, arg, context) ?? arg);
-
-                return ts.factory.createTypeReferenceNode(
-                    ts.factory.createIdentifier(referencedName),
-                    updatedArgs,
+                const updatedArgs = typeNode.typeArguments?.map(
+                    (arg) => sanitizeDependencyType(dep, arg, context) ?? arg,
                 );
+
+                return ts.factory.createTypeReferenceNode(ts.factory.createIdentifier(referencedName), updatedArgs);
             }
         }
 
@@ -184,7 +179,7 @@ function sanitizeDependencyType(
         });
 
         const updatedReturnType = typeNode.type
-            ? sanitizeDependencyType(dep, typeNode.type, context) ?? typeNode.type
+            ? (sanitizeDependencyType(dep, typeNode.type, context) ?? typeNode.type)
             : undefined;
 
         if (
@@ -237,11 +232,7 @@ export function getBlockParameterTypes(
                     const type = context.typeChecker.getTypeOfSymbolAtLocation(symbol, declarationNode);
                     typeNode = sanitizeDependencyType(
                         dep,
-                        context.typeChecker.typeToTypeNode(
-                            type,
-                            declarationNode,
-                            ts.NodeBuilderFlags.InTypeAlias,
-                        ),
+                        context.typeChecker.typeToTypeNode(type, declarationNode, ts.NodeBuilderFlags.InTypeAlias),
                         context,
                     );
                 }
@@ -342,6 +333,10 @@ export function transformJsxElementWithFinePatch(
 
     const blockInfo = transformer.analyzeJsxElement(node);
     const tagName = context.blockAnalyzer!.getJsxTagName(node);
+
+    if (blockInfo.hasNonOptimizableProps) {
+        return generateOptimizedElement(node, tagName, context);
+    }
 
     if (blockInfo.isStatic) {
         return generateStaticElement(node, tagName, context);

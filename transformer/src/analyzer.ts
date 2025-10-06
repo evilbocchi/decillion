@@ -3,6 +3,8 @@ import { robloxStaticDetector } from "./roblox-bridge";
 import type { DependencyInfo, PropEdit, ChildEdit, PatchInstruction, FinePatchBlockInfo } from "./types";
 import { EditType } from "./types";
 
+const BAILOUT_PROP_NAMES = new Set(["ref", "key", "children"]);
+
 export interface BlockInfo {
     id: string;
     staticProps: string[];
@@ -11,6 +13,7 @@ export interface BlockInfo {
     isStatic: boolean;
     dependencies: string[];
     dependencyTypes?: Map<string, DependencyInfo>; // Enhanced dependency tracking with types
+    hasNonOptimizableProps: boolean;
 }
 
 /**
@@ -52,6 +55,7 @@ export class BlockAnalyzer {
             isStatic: true,
             dependencies: [],
             dependencyTypes: new Map(),
+            hasNonOptimizableProps: false,
         };
 
         // React components (PascalCase) should never be treated as static
@@ -65,8 +69,37 @@ export class BlockAnalyzer {
         // Analyze attributes/props
         const attributes = this.getJsxAttributes(node);
         for (const attr of attributes) {
-            if (ts.isJsxAttribute(attr) && attr.initializer) {
+            if (ts.isJsxAttribute(attr)) {
+                if (!attr.initializer) {
+                    const propName = ts.isIdentifier(attr.name) ? attr.name.text : attr.name.getText();
+                    const normalized = propName.toLowerCase();
+                    if (BAILOUT_PROP_NAMES.has(normalized)) {
+                        blockInfo.hasNonOptimizableProps = true;
+                        blockInfo.isStatic = false;
+                        continue;
+                    }
+                    // Boolean shorthand attributes without initializer are treated as static true
+                    blockInfo.staticProps.push(propName);
+                    continue;
+                }
+
                 const propName = ts.isIdentifier(attr.name) ? attr.name.text : attr.name.getText();
+                const normalized = propName.toLowerCase();
+
+                if (BAILOUT_PROP_NAMES.has(normalized)) {
+                    blockInfo.hasNonOptimizableProps = true;
+                    blockInfo.isStatic = false;
+
+                    if (ts.isJsxExpression(attr.initializer) && attr.initializer.expression) {
+                        this.extractDependencies(
+                            attr.initializer.expression,
+                            blockInfo.dependencies,
+                            blockInfo.dependencyTypes,
+                        );
+                    }
+
+                    continue;
+                }
 
                 if (ts.isJsxExpression(attr.initializer) && attr.initializer.expression) {
                     // Dynamic prop - contains expressions
@@ -89,6 +122,10 @@ export class BlockAnalyzer {
                     blockInfo.dynamicProps.push(propName);
                     blockInfo.isStatic = false;
                 }
+            } else if (ts.isJsxSpreadAttribute(attr) && ts.isExpression(attr.expression)) {
+                blockInfo.hasNonOptimizableProps = true;
+                blockInfo.isStatic = false;
+                this.extractDependencies(attr.expression, blockInfo.dependencies, blockInfo.dependencyTypes);
             }
         }
 
@@ -462,6 +499,10 @@ export class BlockAnalyzer {
      * Checks if a block should be memoized based on analysis
      */
     shouldMemoizeBlock(blockInfo: BlockInfo): boolean {
+        if (blockInfo.hasNonOptimizableProps) {
+            return false;
+        }
+
         // Don't memoize purely static blocks (they don't change)
         if (blockInfo.isStatic) {
             return false;

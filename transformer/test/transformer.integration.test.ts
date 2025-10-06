@@ -155,6 +155,24 @@ export const Intrinsic = () => (
         expect(output).toContain("createStaticElement(\"TextLabel\"");
     });
 
+    it("bails out advanced optimizations when using ref props", () => {
+        const source = `
+import { useRef } from "@rbxts/react";
+
+export function WithRef() {
+    const frameRef = useRef<Frame>();
+    return <frame ref={frameRef} BackgroundTransparency={0.2} />;
+}
+`;
+
+        const output = transformSource(source);
+        expect(output).not.toContain("useFinePatchBlock(");
+        expect(output).not.toContain("useMemoizedBlock(");
+        expect(output).not.toContain("createStaticElement(\"Frame\"");
+        expect(output).toContain("React.createElement");
+        expect(output).toContain("ref: frameRef");
+    });
+
     it("emits event patch instructions for event handlers", () => {
         const source = `
 export function WithEvents({ onClick }: { onClick: () => void }) {

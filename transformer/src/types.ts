@@ -19,6 +19,7 @@ export interface BlockInfo {
     isStatic: boolean;
     dependencies: string[];
     dependencyTypes?: Map<string, DependencyInfo>; // Enhanced dependency tracking with types
+    hasNonOptimizableProps: boolean;
 }
 
 export interface PropInfo {
