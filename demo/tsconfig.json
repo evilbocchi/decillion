@@ -13,7 +13,8 @@
                 "noSemanticDiagnostics": true
             },
             {
-                "transform": "../transformer/out"
+                "transform": "../transformer/out",
+                "debug": true,
             }
         ],
         "jsx": "react",

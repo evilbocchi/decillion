@@ -25,41 +25,83 @@ class RuntimeHelper {
     /**
      * Adds runtime imports to the source file
      */
-    addRuntimeImports(file: ts.SourceFile): ts.SourceFile {
-        const runtimeImportDeclaration = ts.factory.createImportDeclaration(
-            undefined,
-            ts.factory.createImportClause(
-                false,
-                undefined,
-                ts.factory.createNamedImports([
-                    ts.factory.createImportSpecifier(
-                        false,
-                        undefined,
-                        ts.factory.createIdentifier("createStaticElement"),
-                    ),
-                    ts.factory.createImportSpecifier(
-                        false,
-                        undefined,
-                        ts.factory.createIdentifier("createStaticInstanceFactory"),
-                    ),
-                    ts.factory.createImportSpecifier(false, undefined, ts.factory.createIdentifier("createBlock")),
-                    ts.factory.createImportSpecifier(false, undefined, ts.factory.createIdentifier("useMemoizedBlock")),
-                    ts.factory.createImportSpecifier(
-                        false,
-                        undefined,
-                        ts.factory.createIdentifier("shouldUpdateBlock"),
-                    ),
-                    ts.factory.createImportSpecifier(
-                        false,
-                        undefined,
-                        ts.factory.createIdentifier("useFinePatchBlock"),
-                    ),
-                ]),
-            ),
-            ts.factory.createStringLiteral("@decillion/runtime"),
-        );
+    addRuntimeImports(file: ts.SourceFile, typeImports: Iterable<string> = []): ts.SourceFile {
+        const runtimeModule = "@decillion/runtime";
+        const requiredValueImports = new Set([
+            "createStaticElement",
+            "createStaticInstanceFactory",
+            "createBlock",
+            "useMemoizedBlock",
+            "shouldUpdateBlock",
+            "useFinePatchBlock",
+        ]);
+        const requiredTypeImports = new Set(Array.from(typeImports));
 
-        const statements = [runtimeImportDeclaration, ...file.statements];
+        const existingStatements: ts.Statement[] = [];
+
+        for (const statement of file.statements) {
+            if (
+                ts.isImportDeclaration(statement) &&
+                ts.isStringLiteral(statement.moduleSpecifier) &&
+                statement.moduleSpecifier.text === runtimeModule &&
+                statement.importClause
+            ) {
+                const { importClause } = statement;
+                const namedBindings = importClause.namedBindings;
+
+                if (namedBindings && ts.isNamedImports(namedBindings)) {
+                    for (const element of namedBindings.elements) {
+                        const importedName = element.name.text;
+                        if (importClause.isTypeOnly) {
+                            requiredTypeImports.delete(importedName);
+                        } else {
+                            requiredValueImports.delete(importedName);
+                        }
+                    }
+                }
+
+                existingStatements.push(statement);
+                continue;
+            }
+
+            existingStatements.push(statement);
+        }
+
+        const newStatements: ts.Statement[] = [];
+
+        if (requiredValueImports.size > 0) {
+            const valueSpecifiers = Array.from(requiredValueImports)
+                .sort()
+                .map((name) =>
+                    ts.factory.createImportSpecifier(false, undefined, ts.factory.createIdentifier(name)),
+                );
+
+            newStatements.push(
+                ts.factory.createImportDeclaration(
+                    undefined,
+                    ts.factory.createImportClause(false, undefined, ts.factory.createNamedImports(valueSpecifiers)),
+                    ts.factory.createStringLiteral(runtimeModule),
+                ),
+            );
+        }
+
+        if (requiredTypeImports.size > 0) {
+            const typeSpecifiers = Array.from(requiredTypeImports)
+                .sort()
+                .map((name) =>
+                    ts.factory.createImportSpecifier(false, undefined, ts.factory.createIdentifier(name)),
+                );
+
+            newStatements.push(
+                ts.factory.createImportDeclaration(
+                    undefined,
+                    ts.factory.createImportClause(true, undefined, ts.factory.createNamedImports(typeSpecifiers)),
+                    ts.factory.createStringLiteral(runtimeModule),
+                ),
+            );
+        }
+
+        const statements = [...newStatements, ...existingStatements];
 
         return ts.factory.updateSourceFile(
             file,

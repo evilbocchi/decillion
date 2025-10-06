@@ -150,8 +150,7 @@ export default function MassiveListBenchmark() {
                     Event={{
                         MouseButton1Click: () =>
                             setItemCount((current) => {
-                                const next = current >= 5000 ? 1000 : current + 1000;
-                                return next;
+                                return current >= 5000 ? 1000 : current + 1000;
                             }),
                     }}
                 />

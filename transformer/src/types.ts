@@ -96,4 +96,6 @@ export interface OptimizationContext {
     functionContextStack: string[];
     /** Map of tag names to Roblox instance names */
     tagToInstanceNameMap: Map<string, string>;
+    /** Type-only imports required from the runtime */
+    requiredTypeImports: Set<string>;
 }

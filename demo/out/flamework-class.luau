@@ -1,16 +1,20 @@
 -- Compiled with roblox-ts v3.0.0
 local TS = require(game:GetService("ReplicatedStorage"):WaitForChild("rbxts_include"):WaitForChild("RuntimeLib"))
-local createStaticElement = TS.import(script, game:GetService("ReplicatedStorage"), "rbxts_include", "node_modules", "@decillion", "runtime", "out").createStaticElement
+local _runtime = TS.import(script, game:GetService("ReplicatedStorage"), "rbxts_include", "node_modules", "@decillion", "runtime", "out")
+local createStaticElement = _runtime.createStaticElement
+local createStaticInstanceFactory = _runtime.createStaticInstanceFactory
 local Reflect = TS.import(script, game:GetService("ReplicatedStorage"), "rbxts_include", "node_modules", "@flamework", "core", "out").Reflect
 local Service = TS.import(script, game:GetService("ReplicatedStorage"), "rbxts_include", "node_modules", "@flamework", "core", "out").Service
 local ReactRoblox = TS.import(script, game:GetService("ReplicatedStorage"), "rbxts_include", "node_modules", "@rbxts", "react-roblox")
 local Workspace = TS.import(script, game:GetService("ReplicatedStorage"), "rbxts_include", "node_modules", "@rbxts", "services").Workspace
 -- Static declarations - extracted from render functions for optimal performance
-local STATIC_PROPS_TEXTLABEL_8lvh98 = {
+local STATIC_PROPS_TEXTLABEL_259cb8 = {
 	Text = "Static Element",
 }
-local STATIC_ELEMENT_TEXTLABEL_0puas2 = createStaticElement("TextLabel", STATIC_PROPS_TEXTLABEL_8lvh98)
-local STATIC_ELEMENT_FRAME_5j492x = createStaticElement("Frame", nil, STATIC_ELEMENT_TEXTLABEL_0puas2)
+local STATIC_ELEMENT_TEXTLABEL_75oahq = createStaticElement("TextLabel", STATIC_PROPS_TEXTLABEL_259cb8)
+local STATIC_INSTANCE_TEXTLABEL_g36921 = createStaticInstanceFactory(STATIC_ELEMENT_TEXTLABEL_75oahq)
+local STATIC_ELEMENT_FRAME_8alnki = createStaticElement("Frame", nil, STATIC_ELEMENT_TEXTLABEL_75oahq)
+local STATIC_INSTANCE_FRAME_l8ldei = createStaticInstanceFactory(STATIC_ELEMENT_FRAME_8alnki)
 local FlameworkClass
 do
 	FlameworkClass = setmetatable({}, {
@@ -26,7 +30,7 @@ do
 	function FlameworkClass:constructor()
 	end
 	function FlameworkClass:createStaticElement()
-		return STATIC_ELEMENT_FRAME_5j492x
+		return STATIC_ELEMENT_FRAME_8alnki
 	end
 	function FlameworkClass:onInit()
 		print("FlameworkClass initialized!")

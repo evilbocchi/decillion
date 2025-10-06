@@ -2,12 +2,13 @@
 local TS = require(game:GetService("ReplicatedStorage"):WaitForChild("rbxts_include"):WaitForChild("RuntimeLib"))
 local _runtime = TS.import(script, game:GetService("ReplicatedStorage"), "rbxts_include", "node_modules", "@decillion", "runtime", "out")
 local createStaticElement = _runtime.createStaticElement
+local createStaticInstanceFactory = _runtime.createStaticInstanceFactory
 local useFinePatchBlock = _runtime.useFinePatchBlock
 local _react = TS.import(script, game:GetService("ReplicatedStorage"), "rbxts_include", "node_modules", "@rbxts", "react")
 local React = _react
 local useState = _react.useState
 -- Static declarations - extracted from render functions for optimal performance
-local STATIC_PROPS_TEXTLABEL_b4e9qb = {
+local STATIC_PROPS_TEXTLABEL_zqsm5r = {
 	Text = "Use the buttons to reorder blocks without remounting.",
 	Size = UDim2.new(1, 0, 0, 30),
 	Position = UDim2.new(0, 0, 0, 80),
@@ -15,7 +16,8 @@ local STATIC_PROPS_TEXTLABEL_b4e9qb = {
 	BackgroundTransparency = 1,
 	TextWrapped = true,
 }
-local STATIC_ELEMENT_TEXTLABEL_v8q56q = createStaticElement("TextLabel", STATIC_PROPS_TEXTLABEL_b4e9qb)
+local STATIC_ELEMENT_TEXTLABEL_87ft9l = createStaticElement("TextLabel", STATIC_PROPS_TEXTLABEL_zqsm5r)
+local STATIC_INSTANCE_TEXTLABEL_qguxwy = createStaticInstanceFactory(STATIC_ELEMENT_TEXTLABEL_87ft9l)
 local initialItems = { {
 	key = "a",
 	label = "Alpha",
@@ -84,7 +86,7 @@ local function MoveItemRow(_param)
 			propName = "Text",
 			path = { 0, 0 },
 		} },
-	} }, "dynamic_frame_5t4kyon4o")
+	} }, "dynamic_frame_r9rirktxv")
 end
 local function MoveTestBenchmark()
 	local items, setItems = useState(initialItems)
@@ -204,7 +206,7 @@ local function MoveTestBenchmark()
 				Event = {
 					MouseButton1Click = shuffleItems,
 				},
-			}), STATIC_ELEMENT_TEXTLABEL_v8q56q)
+			}), STATIC_ELEMENT_TEXTLABEL_87ft9l)
 		end, { iteration, rotateForward, rotateBackward, swapMiddle, shuffleItems }, { {
 			elementPath = { 0, 0 },
 			edits = { {
@@ -245,7 +247,7 @@ local function MoveTestBenchmark()
 				propName = "Event",
 				path = { 0, 4 },
 			} },
-		} }, "dynamic_frame_5ktqzj4ye"), useFinePatchBlock(function(items, MoveItemRow)
+		} }, "dynamic_frame_uacu8nchb"), useFinePatchBlock(function(items, MoveItemRow)
 			local _exp = {
 				Size = UDim2.new(1, 0, 1, -140),
 				Position = UDim2.new(0, 0, 0, 140),
@@ -287,7 +289,7 @@ local function MoveTestBenchmark()
 				index = 1,
 				path = { 0, 1 },
 			} },
-		} }, "dynamic_scrollingframe_05gn3hocf"))
+		} }, "dynamic_scrollingframe_rwiw6ximf"))
 	end, { iteration, rotateForward, rotateBackward, swapMiddle, shuffleItems, items, MoveItemRow }, { {
 		elementPath = { 0, 0, 0 },
 		edits = { {
@@ -344,7 +346,7 @@ local function MoveTestBenchmark()
 			index = 1,
 			path = { 0, 1, 1 },
 		} },
-	} }, "dynamic_frame_53vku4uze")
+	} }, "dynamic_frame_86ss4jzop")
 end
 return {
 	default = MoveTestBenchmark,

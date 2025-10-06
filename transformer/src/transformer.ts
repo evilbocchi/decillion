@@ -29,6 +29,182 @@ function createTagReference(tagName: string): ts.Expression {
     }
 }
 
+function sanitizeDependencyType(
+    dep: string,
+    typeNode: ts.TypeNode | undefined,
+    context?: OptimizationContext,
+): ts.TypeNode | undefined {
+    if (!typeNode) {
+        return undefined;
+    }
+
+    if (ts.isTypeQueryNode(typeNode) && ts.isIdentifier(typeNode.exprName) && typeNode.exprName.text === dep) {
+        return ts.factory.createTypeQueryNode(
+            ts.factory.createQualifiedName(
+                ts.factory.createIdentifier("globalThis"),
+                ts.factory.createIdentifier(dep),
+            ),
+        );
+    }
+
+    if (ts.isTypeReferenceNode(typeNode)) {
+        const typeName = typeNode.typeName;
+
+        if (ts.isIdentifier(typeName)) {
+            const referencedName = typeName.text;
+
+            if (referencedName === dep) {
+                return ts.factory.createTypeQueryNode(
+                    ts.factory.createQualifiedName(
+                        ts.factory.createIdentifier("globalThis"),
+                        ts.factory.createIdentifier(dep),
+                    ),
+                );
+            }
+
+            if (context && referencedName === "VirtualListResult") {
+                context.requiredTypeImports.add("VirtualListResult");
+            }
+        } else if (ts.isQualifiedName(typeName)) {
+            const referencedName = typeName.right.text;
+
+            if (context && referencedName === "VirtualListResult") {
+                context.requiredTypeImports.add("VirtualListResult");
+
+                const updatedArgs = typeNode.typeArguments
+                    ?.map((arg) => sanitizeDependencyType(dep, arg, context) ?? arg);
+
+                return ts.factory.createTypeReferenceNode(
+                    ts.factory.createIdentifier(referencedName),
+                    updatedArgs,
+                );
+            }
+        }
+
+        if (typeNode.typeArguments?.length) {
+            const updatedArgs = typeNode.typeArguments.map((arg) => sanitizeDependencyType(dep, arg, context) ?? arg);
+            if (updatedArgs.some((arg, index) => arg !== typeNode.typeArguments![index])) {
+                return ts.factory.createTypeReferenceNode(typeNode.typeName, updatedArgs);
+            }
+        }
+
+        return typeNode;
+    }
+
+    if (ts.isUnionTypeNode(typeNode)) {
+        const updatedTypes = typeNode.types.map((t) => sanitizeDependencyType(dep, t, context) ?? t);
+        if (updatedTypes.some((t, index) => t !== typeNode.types[index])) {
+            return ts.factory.createUnionTypeNode(updatedTypes);
+        }
+        return typeNode;
+    }
+
+    if (ts.isParenthesizedTypeNode(typeNode)) {
+        const inner = sanitizeDependencyType(dep, typeNode.type, context);
+        if (inner && inner !== typeNode.type) {
+            return ts.factory.createParenthesizedType(inner);
+        }
+        return typeNode;
+    }
+
+    if (ts.isArrayTypeNode(typeNode)) {
+        const elementType = sanitizeDependencyType(dep, typeNode.elementType, context);
+        if (elementType && elementType !== typeNode.elementType) {
+            return ts.factory.createArrayTypeNode(elementType);
+        }
+        return typeNode;
+    }
+
+    if (ts.isTupleTypeNode(typeNode)) {
+        const updatedElements = typeNode.elements.map((el) => sanitizeDependencyType(dep, el, context) ?? el);
+        if (updatedElements.some((el, index) => el !== typeNode.elements[index])) {
+            return ts.factory.createTupleTypeNode(updatedElements);
+        }
+        return typeNode;
+    }
+
+    if (ts.isTypeOperatorNode(typeNode)) {
+        const target = sanitizeDependencyType(dep, typeNode.type, context);
+        if (target && target !== typeNode.type) {
+            return ts.factory.createTypeOperatorNode(typeNode.operator, target);
+        }
+        return typeNode;
+    }
+
+    if (ts.isIndexedAccessTypeNode(typeNode)) {
+        const objectType = sanitizeDependencyType(dep, typeNode.objectType, context) ?? typeNode.objectType;
+        const indexType = sanitizeDependencyType(dep, typeNode.indexType, context) ?? typeNode.indexType;
+        if (objectType !== typeNode.objectType || indexType !== typeNode.indexType) {
+            return ts.factory.createIndexedAccessTypeNode(objectType, indexType);
+        }
+        return typeNode;
+    }
+
+    if (ts.isTypeLiteralNode(typeNode)) {
+        const updatedMembers = typeNode.members.map((member) => {
+            if (ts.isPropertySignature(member) && member.type) {
+                const newType = sanitizeDependencyType(dep, member.type, context);
+                if (newType && newType !== member.type) {
+                    return ts.factory.updatePropertySignature(
+                        member,
+                        member.modifiers,
+                        member.name,
+                        member.questionToken,
+                        newType,
+                    );
+                }
+            }
+            return member;
+        });
+
+        if (updatedMembers.some((member, index) => member !== typeNode.members[index])) {
+            return ts.factory.updateTypeLiteralNode(typeNode, ts.factory.createNodeArray(updatedMembers));
+        }
+
+        return typeNode;
+    }
+
+    if (ts.isFunctionTypeNode(typeNode)) {
+        const updatedParameters = typeNode.parameters.map((param) => {
+            if (param.type) {
+                const newType = sanitizeDependencyType(dep, param.type, context);
+                if (newType && newType !== param.type) {
+                    return ts.factory.updateParameterDeclaration(
+                        param,
+                        param.modifiers,
+                        param.dotDotDotToken,
+                        param.name,
+                        param.questionToken,
+                        newType,
+                        param.initializer,
+                    );
+                }
+            }
+            return param;
+        });
+
+        const updatedReturnType = typeNode.type
+            ? sanitizeDependencyType(dep, typeNode.type, context) ?? typeNode.type
+            : undefined;
+
+        if (
+            updatedParameters.some((param, index) => param !== typeNode.parameters[index]) ||
+            (updatedReturnType && typeNode.type && updatedReturnType !== typeNode.type)
+        ) {
+            return ts.factory.updateFunctionTypeNode(
+                typeNode,
+                typeNode.typeParameters,
+                ts.factory.createNodeArray(updatedParameters),
+                updatedReturnType ?? typeNode.type,
+            );
+        }
+
+        return typeNode;
+    }
+
+    return typeNode;
+}
+
 /**
  * Utility function to fetch parameter types for a memoized block
  * This can be used externally to get type information for dependencies
@@ -46,7 +222,7 @@ export function getBlockParameterTypes(
         // Try to get type information from the dependency types map
         if (blockInfo.dependencyTypes?.has(dep)) {
             const depInfo = blockInfo.dependencyTypes.get(dep)!;
-            typeNode = depInfo.type;
+            typeNode = sanitizeDependencyType(dep, depInfo.type, context);
             sourceNode = depInfo.sourceNode;
         }
 
@@ -59,10 +235,14 @@ export function getBlockParameterTypes(
                 const declarationNode = symbol.valueDeclaration || symbol.declarations?.[0];
                 if (declarationNode) {
                     const type = context.typeChecker.getTypeOfSymbolAtLocation(symbol, declarationNode);
-                    typeNode = context.typeChecker.typeToTypeNode(
-                        type,
-                        declarationNode,
-                        ts.NodeBuilderFlags.InTypeAlias,
+                    typeNode = sanitizeDependencyType(
+                        dep,
+                        context.typeChecker.typeToTypeNode(
+                            type,
+                            declarationNode,
+                            ts.NodeBuilderFlags.InTypeAlias,
+                        ),
+                        context,
                     );
                 }
             }
@@ -127,6 +307,7 @@ export class DecillionTransformer {
             skipTransformFunctions: new Set<string>(),
             functionContextStack: [],
             tagToInstanceNameMap: robloxStaticDetector.getTagToInstanceNameMap(),
+            requiredTypeImports: new Set<string>(),
         };
     }
 
@@ -205,18 +386,26 @@ function generateFinePatchBlock(
     );
 
     const parameters = new Array<ts.ParameterDeclaration>();
+    const dependencyTypeNodes: ts.TypeNode[] = [];
+    const orderedDependencies: string[] = [];
+    const processedDependencies = new Set<string>();
 
     // Create parameters for dependencies
-    const processedDependencies = new Set<string>();
     for (const dep of blockInfo.dependencies) {
-        if (processedDependencies.has(dep)) continue;
+        if (processedDependencies.has(dep)) {
+            continue;
+        }
+
         processedDependencies.add(dep);
+        orderedDependencies.push(dep);
 
         let typeNode: ts.TypeNode | undefined;
         if (blockInfo.dependencyTypes?.has(dep)) {
             const depInfo = blockInfo.dependencyTypes.get(dep)!;
-            typeNode = depInfo.type;
+            typeNode = sanitizeDependencyType(dep, depInfo.type, context);
         }
+
+        dependencyTypeNodes.push(typeNode ?? ts.factory.createKeywordTypeNode(ts.SyntaxKind.AnyKeyword));
 
         parameters.push(
             ts.factory.createParameterDeclaration(
@@ -243,10 +432,13 @@ function generateFinePatchBlock(
     const patchInstructionsArray = createPatchInstructionsLiteral(finePatchInfo.patchInstructions);
 
     // Use fine-grained patch function
-    const finalDependencies = Array.from(processedDependencies);
+    const finalDependencies = orderedDependencies;
+    const genericArguments = dependencyTypeNodes.length
+        ? [ts.factory.createTupleTypeNode(dependencyTypeNodes)]
+        : undefined;
 
     return {
-        element: ts.factory.createCallExpression(ts.factory.createIdentifier("useFinePatchBlock"), undefined, [
+        element: ts.factory.createCallExpression(ts.factory.createIdentifier("useFinePatchBlock"), genericArguments, [
             arrowFunction,
             createDependenciesArray(finalDependencies),
             patchInstructionsArray,
@@ -470,15 +662,19 @@ function generateMemoizedBlock(
         // Try to get type information from the dependency types map first
         if (blockInfo.dependencyTypes?.has(dep)) {
             const depInfo = blockInfo.dependencyTypes.get(dep)!;
-            typeNode = depInfo.type;
+            typeNode = sanitizeDependencyType(dep, depInfo.type, context);
 
             // If we have a source node, try to get the type from there for better accuracy
             if (!typeNode && depInfo.sourceNode && context.typeChecker) {
                 const type = context.typeChecker.getTypeAtLocation(depInfo.sourceNode);
-                typeNode = context.typeChecker.typeToTypeNode(
-                    type,
-                    depInfo.sourceNode,
-                    ts.NodeBuilderFlags.InTypeAlias | ts.NodeBuilderFlags.UseAliasDefinedOutsideCurrentScope,
+                typeNode = sanitizeDependencyType(
+                    dep,
+                    context.typeChecker.typeToTypeNode(
+                        type,
+                        depInfo.sourceNode,
+                        ts.NodeBuilderFlags.InTypeAlias | ts.NodeBuilderFlags.UseAliasDefinedOutsideCurrentScope,
+                    ),
+                    context,
                 );
             }
         }
@@ -508,10 +704,14 @@ function generateMemoizedBlock(
             const symbol = context.typeChecker.getSymbolAtLocation(tempIdentifier);
             if (symbol && symbol.valueDeclaration) {
                 const type = context.typeChecker.getTypeOfSymbolAtLocation(symbol, symbol.valueDeclaration);
-                typeNode = context.typeChecker.typeToTypeNode(
-                    type,
-                    symbol.valueDeclaration,
-                    ts.NodeBuilderFlags.InTypeAlias | ts.NodeBuilderFlags.UseAliasDefinedOutsideCurrentScope,
+                typeNode = sanitizeDependencyType(
+                    dep,
+                    context.typeChecker.typeToTypeNode(
+                        type,
+                        symbol.valueDeclaration,
+                        ts.NodeBuilderFlags.InTypeAlias | ts.NodeBuilderFlags.UseAliasDefinedOutsideCurrentScope,
+                    ),
+                    context,
                 );
             }
         }

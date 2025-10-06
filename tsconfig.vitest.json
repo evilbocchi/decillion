@@ -1,0 +1,6 @@
+{
+    "extends": "./tsconfig.json",
+    "include": [
+        "transformer/vitest.config.ts"
+    ]
+}

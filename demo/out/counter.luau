@@ -2,36 +2,41 @@
 local TS = require(game:GetService("ReplicatedStorage"):WaitForChild("rbxts_include"):WaitForChild("RuntimeLib"))
 local _runtime = TS.import(script, game:GetService("ReplicatedStorage"), "rbxts_include", "node_modules", "@decillion", "runtime", "out")
 local createStaticElement = _runtime.createStaticElement
+local createStaticInstanceFactory = _runtime.createStaticInstanceFactory
 local useFinePatchBlock = _runtime.useFinePatchBlock
 local _react = TS.import(script, game:GetService("ReplicatedStorage"), "rbxts_include", "node_modules", "@rbxts", "react")
 local React = _react
 local useState = _react.useState
 -- Static declarations - extracted from render functions for optimal performance
-local STATIC_PROPS_TEXTLABEL_mvzazr = {
+local STATIC_PROPS_TEXTLABEL_yf0ew1 = {
 	Text = "Optimized Counter App",
 	TextColor3 = Color3.fromRGB(255, 255, 255),
 	BackgroundTransparency = 1,
 	Size = UDim2.new(1, 0, 1, 0),
 }
-local STATIC_PROPS_TEXTLABEL_84hnbe = {
+local STATIC_PROPS_TEXTLABEL_tsxgwg = {
 	Text = "Performance: Decillion Optimized",
 	TextColor3 = Color3.fromRGB(200, 200, 200),
 	BackgroundTransparency = 1,
 	Size = UDim2.new(1, 0, 1, 0),
 }
-local STATIC_PROPS_FRAME_nn83am = {
+local STATIC_PROPS_FRAME_15eh0c = {
 	BackgroundColor3 = Color3.fromRGB(50, 50, 50),
 	Size = UDim2.new(1, 0, 0, 50),
 }
-local STATIC_PROPS_FRAME_4d1xrf = {
+local STATIC_PROPS_FRAME_c6j1jn = {
 	Size = UDim2.new(1, 0, 0, 100),
 	Position = UDim2.new(0, 0, 0, 160),
 	BackgroundColor3 = Color3.fromRGB(60, 60, 60),
 }
-local STATIC_ELEMENT_TEXTLABEL_5l5ba8 = createStaticElement("TextLabel", STATIC_PROPS_TEXTLABEL_mvzazr)
-local STATIC_ELEMENT_FRAME_fviyte = createStaticElement("Frame", STATIC_PROPS_FRAME_nn83am, STATIC_ELEMENT_TEXTLABEL_5l5ba8)
-local STATIC_ELEMENT_TEXTLABEL_tt6if4 = createStaticElement("TextLabel", STATIC_PROPS_TEXTLABEL_84hnbe)
-local STATIC_ELEMENT_FRAME_r52mtr = createStaticElement("Frame", STATIC_PROPS_FRAME_4d1xrf, STATIC_ELEMENT_TEXTLABEL_tt6if4)
+local STATIC_ELEMENT_TEXTLABEL_8ijoc5 = createStaticElement("TextLabel", STATIC_PROPS_TEXTLABEL_yf0ew1)
+local STATIC_INSTANCE_TEXTLABEL_92ucnu = createStaticInstanceFactory(STATIC_ELEMENT_TEXTLABEL_8ijoc5)
+local STATIC_ELEMENT_FRAME_krsqnd = createStaticElement("Frame", STATIC_PROPS_FRAME_15eh0c, STATIC_ELEMENT_TEXTLABEL_8ijoc5)
+local STATIC_INSTANCE_FRAME_lmxhl3 = createStaticInstanceFactory(STATIC_ELEMENT_FRAME_krsqnd)
+local STATIC_ELEMENT_TEXTLABEL_bad97x = createStaticElement("TextLabel", STATIC_PROPS_TEXTLABEL_tsxgwg)
+local STATIC_INSTANCE_TEXTLABEL_nqf65z = createStaticInstanceFactory(STATIC_ELEMENT_TEXTLABEL_bad97x)
+local STATIC_ELEMENT_FRAME_xaddb3 = createStaticElement("Frame", STATIC_PROPS_FRAME_c6j1jn, STATIC_ELEMENT_TEXTLABEL_bad97x)
+local STATIC_INSTANCE_FRAME_x6awer = createStaticInstanceFactory(STATIC_ELEMENT_FRAME_xaddb3)
 local function Counter()
 	local count, setCount = useState(0)
 	local increment = function()
@@ -44,7 +49,7 @@ local function Counter()
 		return React.createElement("frame", {
 			Size = UDim2.new(1, 0, 1, 0),
 			BackgroundColor3 = Color3.fromRGB(30, 30, 30),
-		}, STATIC_ELEMENT_FRAME_fviyte, React.createElement("textlabel", {
+		}, STATIC_ELEMENT_FRAME_krsqnd, React.createElement("textlabel", {
 			Text = `Count: {count}`,
 			TextColor3 = Color3.fromRGB(255, 255, 255),
 			BackgroundColor3 = Color3.fromRGB(100, 100, 100),
@@ -68,7 +73,7 @@ local function Counter()
 			Event = {
 				MouseButton1Click = decrement,
 			},
-		}), STATIC_ELEMENT_FRAME_r52mtr)
+		}), STATIC_ELEMENT_FRAME_xaddb3)
 	end, { count, increment, decrement }, { {
 		elementPath = { 0, 1 },
 		edits = { {
@@ -93,7 +98,7 @@ local function Counter()
 			propName = "Event",
 			path = { 0, 3 },
 		} },
-	} }, "dynamic_frame_socnhxd52")
+	} }, "dynamic_frame_ytfgej4i8")
 end
 return {
 	default = Counter,

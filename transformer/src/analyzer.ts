@@ -234,6 +234,9 @@ export class BlockAnalyzer {
             if (this.isIdentifierPartOfJsxIntrinsicTag(expr)) {
                 return;
             }
+            if (this.isStaticGlobalIdentifier(expr.text)) {
+                return;
+            }
             // Only add if not already present
             if (!deps.includes(expr.text)) {
                 deps.push(expr.text);
@@ -391,6 +394,10 @@ export class BlockAnalyzer {
                 this.extractDependencies(child, deps, depTypes);
             }
         });
+    }
+
+    private isStaticGlobalIdentifier(name: string): boolean {
+        return name === "string" || name === "math";
     }
 
     private isIdentifierPartOfJsxIntrinsicTag(identifier: ts.Identifier): boolean {

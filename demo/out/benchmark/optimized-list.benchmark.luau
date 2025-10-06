@@ -2,20 +2,21 @@
 local TS = require(game:GetService("ReplicatedStorage"):WaitForChild("rbxts_include"):WaitForChild("RuntimeLib"))
 local _runtime = TS.import(script, game:GetService("ReplicatedStorage"), "rbxts_include", "node_modules", "@decillion", "runtime", "out")
 local createStaticElement = _runtime.createStaticElement
+local createStaticInstanceFactory = _runtime.createStaticInstanceFactory
 local useFinePatchBlock = _runtime.useFinePatchBlock
 local _react = TS.import(script, game:GetService("ReplicatedStorage"), "rbxts_include", "node_modules", "@rbxts", "react")
 local React = _react
 local useState = _react.useState
 local useEffect = _react.useEffect
 -- Static declarations - extracted from render functions for optimal performance
-local STATIC_PROPS_TEXTBUTTON_2ceyx6 = {
+local STATIC_PROPS_TEXTBUTTON_0mwqya = {
 	Text = "Toggle First Item",
 	Size = UDim2.new(0.25, 0, 0, 25),
 	Position = UDim2.new(0.5, 0, 0, 30),
 	BackgroundColor3 = Color3.fromRGB(150, 100, 100),
 	TextColor3 = Color3.fromRGB(255, 255, 255),
 }
-local STATIC_PROPS_TEXTLABEL_t0kh54 = {
+local STATIC_PROPS_TEXTLABEL_nkmuii = {
 	Text = "Click individual items to toggle them. Notice how Decillion only updates changed items.",
 	Size = UDim2.new(1, 0, 0, 50),
 	Position = UDim2.new(0, 0, 0, 60),
@@ -23,8 +24,10 @@ local STATIC_PROPS_TEXTLABEL_t0kh54 = {
 	BackgroundTransparency = 1,
 	TextWrapped = true,
 }
-local STATIC_ELEMENT_TEXTBUTTON_jezbps = createStaticElement("TextButton", STATIC_PROPS_TEXTBUTTON_2ceyx6)
-local STATIC_ELEMENT_TEXTLABEL_0npp43 = createStaticElement("TextLabel", STATIC_PROPS_TEXTLABEL_t0kh54)
+local STATIC_ELEMENT_TEXTBUTTON_2fm4m6 = createStaticElement("TextButton", STATIC_PROPS_TEXTBUTTON_0mwqya)
+local STATIC_INSTANCE_TEXTBUTTON_ieunmk = createStaticInstanceFactory(STATIC_ELEMENT_TEXTBUTTON_2fm4m6)
+local STATIC_ELEMENT_TEXTLABEL_ytxpa1 = createStaticElement("TextLabel", STATIC_PROPS_TEXTLABEL_nkmuii)
+local STATIC_INSTANCE_TEXTLABEL_tsoj9s = createStaticInstanceFactory(STATIC_ELEMENT_TEXTLABEL_ytxpa1)
 --[[
 	*
 	 * Advanced List Optimization Benchmark
@@ -88,7 +91,7 @@ local function TraditionalListItem(_param)
 			propName = "BackgroundColor3",
 			path = { 0, 1 },
 		} },
-	} }, "dynamic_frame_vawqu4t4r")
+	} }, "dynamic_frame_1k0w6jbtu")
 end
 -- Decillion optimized approach
 local function OptimizedListItem(_param)
@@ -147,7 +150,7 @@ local function OptimizedListItem(_param)
 			propName = "BackgroundColor3",
 			path = { 0, 1 },
 		} },
-	} }, "dynamic_frame_e90iu0pzw")
+	} }, "dynamic_frame_zb7mt4s35")
 end
 local function OptimizedListBenchmark()
 	local itemCount, setItemCount = useState(100)
@@ -260,7 +263,7 @@ local function OptimizedListBenchmark()
 				Event = {
 					MouseButton1Click = triggerFullRerender,
 				},
-			}), STATIC_ELEMENT_TEXTBUTTON_jezbps, React.createElement("textbutton", {
+			}), STATIC_ELEMENT_TEXTBUTTON_2fm4m6, React.createElement("textbutton", {
 				Text = `Items: {itemCount}`,
 				Size = UDim2.new(0.25, 0, 0, 25),
 				Position = UDim2.new(0.75, 0, 0, 30),
@@ -271,7 +274,7 @@ local function OptimizedListBenchmark()
 						return setItemCount(if itemCount == 100 then 500 elseif itemCount == 500 then 1000 else 100)
 					end,
 				},
-			}), STATIC_ELEMENT_TEXTLABEL_0npp43)
+			}), STATIC_ELEMENT_TEXTLABEL_ytxpa1)
 		end, { itemCount, renderCount, useOptimized, triggerFullRerender }, { {
 			elementPath = { 0, 0 },
 			edits = { {
@@ -309,7 +312,7 @@ local function OptimizedListBenchmark()
 				propName = "Text",
 				path = { 0, 4 },
 			} },
-		} }, "dynamic_frame_djqjpaswe"), useFinePatchBlock(function(itemCount, items, ListComponent)
+		} }, "dynamic_frame_nszjm8dj6"), useFinePatchBlock(function(itemCount, items, ListComponent)
 			local _exp = {
 				Size = UDim2.new(1, 0, 1, -120),
 				Position = UDim2.new(0, 0, 0, 120),
@@ -354,7 +357,7 @@ local function OptimizedListBenchmark()
 				index = 1,
 				path = { 0, 1 },
 			} },
-		} }, "dynamic_scrollingframe_6vq2wg0tp"))
+		} }, "dynamic_scrollingframe_rpxp35bgo"))
 	end, { itemCount, renderCount, useOptimized, triggerFullRerender, items, ListComponent }, { {
 		elementPath = { 0, 0, 0 },
 		edits = { {
@@ -408,7 +411,7 @@ local function OptimizedListBenchmark()
 			index = 1,
 			path = { 0, 1, 1 },
 		} },
-	} }, "dynamic_frame_u2g1q76bl")
+	} }, "dynamic_frame_ztptfecdi")
 end
 return {
 	default = OptimizedListBenchmark,

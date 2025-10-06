@@ -4,6 +4,8 @@ local useFinePatchBlock = TS.import(script, game:GetService("ReplicatedStorage")
 local _react = TS.import(script, game:GetService("ReplicatedStorage"), "rbxts_include", "node_modules", "@rbxts", "react")
 local React = _react
 local useState = _react.useState
+local useMemo = _react.useMemo
+local useVirtualList = TS.import(script, game:GetService("ReplicatedStorage"), "rbxts_include", "node_modules", "@decillion", "runtime", "out").useVirtualList
 --[[
 	*
 	 * Benchmark: Massive List Rendering
@@ -17,9 +19,11 @@ local function TraditionalListItem(_param)
 	local name = _param.name
 	local value = _param.value
 	local isActive = _param.isActive
+	local layoutOrder = _param.layoutOrder
 	return React.createElement("frame", {
 		Size = UDim2.new(1, 0, 0, 40),
 		BackgroundColor3 = if isActive then Color3.fromRGB(100, 150, 100) else Color3.fromRGB(80, 80, 80),
+		LayoutOrder = layoutOrder,
 	}, React.createElement("textlabel", {
 		Text = `{name}: {value}`,
 		Size = UDim2.new(0.8, 0, 1, 0),
@@ -39,10 +43,12 @@ local function OptimizedListItem(_param)
 	local name = _param.name
 	local value = _param.value
 	local isActive = _param.isActive
-	return useFinePatchBlock(function(isActive, name, value, id)
+	local layoutOrder = _param.layoutOrder
+	return useFinePatchBlock(function(isActive, layoutOrder, name, value, id)
 		return React.createElement("frame", {
 			Size = UDim2.new(1, 0, 0, 40),
 			BackgroundColor3 = if isActive then Color3.fromRGB(100, 150, 100) else Color3.fromRGB(80, 80, 80),
+			LayoutOrder = layoutOrder,
 		}, React.createElement("textlabel", {
 			Text = `{name}: {value}`,
 			Size = UDim2.new(0.8, 0, 1, 0),
@@ -55,12 +61,17 @@ local function OptimizedListItem(_param)
 			TextColor3 = Color3.fromRGB(200, 200, 200),
 			BackgroundTransparency = 1,
 		}))
-	end, { isActive, name, value, id }, { {
+	end, { isActive, layoutOrder, name, value, id }, { {
 		elementPath = {},
 		edits = { {
 			type = 8,
 			dependencyKey = "isActive",
 			propName = "BackgroundColor3",
+			path = {},
+		}, {
+			type = 1,
+			dependencyKey = "layoutOrder",
+			propName = "LayoutOrder",
 			path = {},
 		} },
 	}, {
@@ -79,36 +90,40 @@ local function OptimizedListItem(_param)
 			propName = "Text",
 			path = { 0, 1 },
 		} },
-	} }, "dynamic_frame_73bz0ezrr")
+	} }, "dynamic_frame_n9yr06b60")
 end
 local function MassiveListBenchmark()
 	local itemCount, setItemCount = useState(1000)
 	local useOptimized, setUseOptimized = useState(true)
 	local updateTrigger, setUpdateTrigger = useState(0)
 	local renderTime, setRenderTime = useState(0)
+	local ITEM_HEIGHT = 45
 	-- Generate test data
-	local items = {}
-	do
-		local i = 0
-		local _shouldIncrement = false
-		while true do
-			if _shouldIncrement then
-				i += 1
-			else
-				_shouldIncrement = true
+	local items = useMemo(function()
+		local generated = {}
+		do
+			local i = 0
+			local _shouldIncrement = false
+			while true do
+				if _shouldIncrement then
+					i += 1
+				else
+					_shouldIncrement = true
+				end
+				if not (i < itemCount) then
+					break
+				end
+				local _arg0 = {
+					id = i,
+					name = `Item {i}`,
+					value = math.random(1, 1000),
+					isActive = math.random() > 0.7,
+				}
+				table.insert(generated, _arg0)
 			end
-			if not (i < itemCount) then
-				break
-			end
-			local _arg0 = {
-				id = i,
-				name = `Item {i}`,
-				value = math.random(1, 1000),
-				isActive = math.random() > 0.7,
-			}
-			table.insert(items, _arg0)
 		end
-	end
+		return generated
+	end, { itemCount, updateTrigger })
 	local triggerUpdate = function()
 		local startTime = tick()
 		setUpdateTrigger(updateTrigger + 1)
@@ -119,7 +134,14 @@ local function MassiveListBenchmark()
 		end)
 	end
 	local ListComponent = if useOptimized then OptimizedListItem else TraditionalListItem
-	return useFinePatchBlock(function(itemCount, useOptimized, triggerUpdate, renderTime, items, ListComponent)
+	local virtualList = useVirtualList({
+		items = items,
+		itemHeight = ITEM_HEIGHT,
+		overscan = 6,
+	})
+	local baseLayoutOrder = virtualList.range.start * 2
+	local visibleCount = #virtualList.visibleItems
+	return useFinePatchBlock(function(itemCount, useOptimized, triggerUpdate, renderTime, baseLayoutOrder, virtualList, visibleCount)
 		return React.createElement("frame", {
 			Size = UDim2.new(1, 0, 1, 0),
 			BackgroundColor3 = Color3.fromRGB(20, 20, 20),
@@ -158,12 +180,19 @@ local function MassiveListBenchmark()
 				Position = UDim2.new(0.7, 0, 0, 35),
 				TextColor3 = Color3.fromRGB(200, 200, 200),
 				BackgroundTransparency = 1,
-			}), React.createElement("textlabel", {
+			}), React.createElement("textbutton", {
 				Text = `Items: {itemCount}`,
-				Size = UDim2.new(0.5, 0, 0, 30),
+				Size = UDim2.new(0.3, 0, 0, 30),
 				Position = UDim2.new(0, 0, 0, 70),
-				TextColor3 = Color3.fromRGB(200, 200, 200),
-				BackgroundTransparency = 1,
+				BackgroundColor3 = Color3.fromRGB(80, 120, 180),
+				TextColor3 = Color3.fromRGB(255, 255, 255),
+				Event = {
+					MouseButton1Click = function()
+						return setItemCount(function(current)
+							return if current >= 5000 then 1000 else current + 1000
+						end)
+					end,
+				},
 			}))
 		end, { itemCount, useOptimized, triggerUpdate, renderTime }, { {
 			elementPath = { 0, 0 },
@@ -210,52 +239,112 @@ local function MassiveListBenchmark()
 				propName = "Text",
 				path = { 0, 4 },
 			} },
-		} }, "dynamic_frame_286c8u4xu"), useFinePatchBlock(function(itemCount, items, ListComponent)
+		} }, "dynamic_frame_l2to0lehr"), useFinePatchBlock(function(baseLayoutOrder, virtualList, visibleCount)
 			local _exp = {
 				Size = UDim2.new(1, 0, 1, -100),
 				Position = UDim2.new(0, 0, 0, 100),
 				BackgroundColor3 = Color3.fromRGB(30, 30, 30),
-				CanvasSize = UDim2.new(0, 0, 0, itemCount * 45),
 				ScrollBarThickness = 10,
 			}
 			local _exp_1 = React.createElement("uilistlayout", {
 				SortOrder = Enum.SortOrder.LayoutOrder,
 				Padding = UDim.new(0, 5),
 			})
+			local _exp_2 = useFinePatchBlock(function(baseLayoutOrder, virtualList)
+				return React.createElement("frame", {
+					LayoutOrder = baseLayoutOrder,
+					Size = UDim2.new(1, 0, 0, virtualList.beforeSpacerHeight),
+					BackgroundTransparency = 1,
+				})
+			end, { baseLayoutOrder, virtualList }, { {
+				elementPath = {},
+				edits = { {
+					type = 1,
+					dependencyKey = "baseLayoutOrder",
+					propName = "LayoutOrder",
+					path = {},
+				}, {
+					type = 1,
+					dependencyKey = "virtualList",
+					propName = "Size",
+					path = {},
+				} },
+			} }, "dynamic_frame_96t5oo709")
+			local _exp_3 = virtualList.visibleItems
 			-- ▼ ReadonlyArray.map ▼
-			local _newValue = table.create(#items)
-			local _callback = function(item, index)
+			local _newValue = table.create(#_exp_3)
+			local _callback = function(virtualItem, visibleIndex)
+				local _binding = virtualItem
+				local item = _binding.item
 				local _attributes = {
-					key = `item-{item.id}-{updateTrigger}`,
+					key = `item-{item.id}`,
 				}
 				for _k, _v in item do
 					_attributes[_k] = _v
 				end
+				_attributes.layoutOrder = baseLayoutOrder + visibleIndex * 2 + 1
 				return React.createElement(ListComponent, _attributes)
 			end
-			for _k, _v in items do
-				_newValue[_k] = _callback(_v, _k - 1, items)
+			for _k, _v in _exp_3 do
+				_newValue[_k] = _callback(_v, _k - 1, _exp_3)
 			end
 			-- ▲ ReadonlyArray.map ▲
-			return React.createElement("scrollingframe", _exp, _exp_1, _newValue)
-		end, { itemCount, items, ListComponent }, { {
-			elementPath = {},
+			return React.createElement("scrollingframe", _exp, _exp_1, _exp_2, _newValue, useFinePatchBlock(function(baseLayoutOrder, visibleCount, virtualList)
+				return React.createElement("frame", {
+					LayoutOrder = baseLayoutOrder + visibleCount * 2 + 1,
+					Size = UDim2.new(1, 0, 0, virtualList.afterSpacerHeight),
+					BackgroundTransparency = 1,
+				})
+			end, { baseLayoutOrder, visibleCount, virtualList }, { {
+				elementPath = {},
+				edits = { {
+					type = 1,
+					dependencyKey = "baseLayoutOrder",
+					propName = "LayoutOrder",
+					path = {},
+				}, {
+					type = 1,
+					dependencyKey = "virtualList",
+					propName = "Size",
+					path = {},
+				} },
+			} }, "dynamic_frame_ytscngc7q"))
+		end, { baseLayoutOrder, virtualList, visibleCount }, { {
+			elementPath = { 0, 1 },
 			edits = { {
 				type = 1,
-				dependencyKey = "itemCount",
-				propName = "CanvasSize",
-				path = {},
+				dependencyKey = "baseLayoutOrder",
+				propName = "LayoutOrder",
+				path = { 0, 1 },
+			}, {
+				type = 1,
+				dependencyKey = "virtualList",
+				propName = "Size",
+				path = { 0, 1 },
 			} },
 		}, {
 			elementPath = { 0 },
 			edits = { {
 				type = 2,
-				dependencyKey = "items",
-				index = 1,
-				path = { 0, 1 },
+				dependencyKey = "virtualList",
+				index = 2,
+				path = { 0, 2 },
 			} },
-		} }, "dynamic_scrollingframe_a3yjgudsn"))
-	end, { itemCount, useOptimized, triggerUpdate, renderTime, items, ListComponent }, { {
+		}, {
+			elementPath = { 0, 3 },
+			edits = { {
+				type = 1,
+				dependencyKey = "baseLayoutOrder",
+				propName = "LayoutOrder",
+				path = { 0, 3 },
+			}, {
+				type = 1,
+				dependencyKey = "virtualList",
+				propName = "Size",
+				path = { 0, 3 },
+			} },
+		} }, "dynamic_scrollingframe_g68cmil6a"))
+	end, { itemCount, useOptimized, triggerUpdate, renderTime, baseLayoutOrder, virtualList, visibleCount }, { {
 		elementPath = { 0, 0, 0 },
 		edits = { {
 			type = 1,
@@ -301,22 +390,40 @@ local function MassiveListBenchmark()
 			path = { 0, 0, 4 },
 		} },
 	}, {
-		elementPath = { 0, 1 },
+		elementPath = { 0, 1, 1 },
 		edits = { {
 			type = 1,
-			dependencyKey = "itemCount",
-			propName = "CanvasSize",
-			path = { 0, 1 },
+			dependencyKey = "baseLayoutOrder",
+			propName = "LayoutOrder",
+			path = { 0, 1, 1 },
+		}, {
+			type = 1,
+			dependencyKey = "virtualList",
+			propName = "Size",
+			path = { 0, 1, 1 },
 		} },
 	}, {
 		elementPath = { 0, 1 },
 		edits = { {
 			type = 2,
-			dependencyKey = "items",
-			index = 1,
-			path = { 0, 1, 1 },
+			dependencyKey = "virtualList",
+			index = 2,
+			path = { 0, 1, 2 },
 		} },
-	} }, "dynamic_frame_0admk4o4r")
+	}, {
+		elementPath = { 0, 1, 3 },
+		edits = { {
+			type = 1,
+			dependencyKey = "baseLayoutOrder",
+			propName = "LayoutOrder",
+			path = { 0, 1, 3 },
+		}, {
+			type = 1,
+			dependencyKey = "virtualList",
+			propName = "Size",
+			path = { 0, 1, 3 },
+		} },
+	} }, "dynamic_frame_64biizil8")
 end
 -- Alternative ways to use @undecillion
 -- Comment-style for arrow functions

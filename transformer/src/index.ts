@@ -27,7 +27,7 @@ export interface DecillionTransformerOptions {
  * Transforms JSX into highly optimized, block-memoized UI code
  */
 export default function (program: ts.Program, options: DecillionTransformerOptions = {}) {
-    const { addSignature = true, signatureMessage, debug = true } = options;
+    const { addSignature = true, signatureMessage, debug = false } = options;
 
     return (context: ts.TransformationContext): ((file: ts.SourceFile) => ts.Node) => {
         return (file: ts.SourceFile) => {
@@ -224,9 +224,9 @@ function applyPostTransformations(
 ): ts.SourceFile {
     let transformedFile = file;
 
-    // Add runtime import if needed
-    if (needsRuntimeImport) {
-        transformedFile = runtimeHelper.addRuntimeImports(transformedFile);
+    // Add runtime import if needed (or when type-only runtime imports are required)
+    if (needsRuntimeImport || context.requiredTypeImports.size > 0) {
+        transformedFile = runtimeHelper.addRuntimeImports(transformedFile, context.requiredTypeImports);
     }
 
     // Add static props tables and static elements if any were created
