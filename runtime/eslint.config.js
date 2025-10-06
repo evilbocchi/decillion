@@ -10,6 +10,8 @@ export default [
         languageOptions: {
             parser: tseslint.parser,
             parserOptions: {
+                tsconfigRootDir: __dirname,
+                project: './tsconfig.json',
                 jsx: true,
                 useJSXTextNode: true,
                 ecmaVersion: 2018,

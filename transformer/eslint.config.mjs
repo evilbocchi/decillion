@@ -12,13 +12,10 @@ export default [
         languageOptions: {
             parser: tsParser,
             parserOptions: {
-                project: [
-                    "tsconfig.json",
-                    "tsconfig.vitest.json"
-                ],
+                tsconfigRootDir: __dirname,
+                project: ["tsconfig.json", "tsconfig.vitest.json"],
                 sourceType: "module",
             },
-            
         },
     },
     {
