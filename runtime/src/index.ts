@@ -136,6 +136,9 @@ export abstract class AbstractBlock {
     /** shouldUpdate - check if the block needs to update */
     abstract u(oldProps: unknown[], newProps: unknown[]): boolean;
 
+    /** move - reposition the block within the instance hierarchy */
+    abstract v(newParent?: Instance, refNode?: Instance | undefined): void;
+
     /** parent - get the parent instance */
     abstract t(): Instance | undefined;
 }
@@ -270,6 +273,24 @@ export class Block extends AbstractBlock {
         }
 
         return root;
+    }
+
+    /**
+     * Move the block to a new parent or position in the hierarchy
+     */
+    v(newParent?: Instance, _refNode?: Instance | undefined): void {
+        const instance = this.l;
+        if (instance === undefined) {
+            return;
+        }
+
+        const parent = newParent ?? this.t();
+        if (parent === undefined) {
+            return;
+        }
+
+        this.moveInstanceToParent(instance, parent);
+        this._t = parent;
     }
 
     /**
@@ -634,6 +655,7 @@ export class Block extends AbstractBlock {
                     entry.instance = blockInstance;
                     instanceBlockMap.set(blockInstance, newChild.node.block);
                 }
+                newChild.node.block.v(parentInstance);
             } else {
                 entry.block = undefined;
                 entry.element = newChild.node.element;
@@ -649,12 +671,17 @@ export class Block extends AbstractBlock {
                 } else {
                     this.updateElementInstance(entry, newChild.node.element);
                 }
+
+                if (entry.instance !== undefined) {
+                    this.moveInstanceToParent(entry.instance, parentInstance);
+                }
             }
 
             newEntries.set(newChild.key, entry);
 
             const instance = entry.block?.l ?? entry.instance;
             if (instance !== undefined) {
+                this.moveInstanceToParent(instance, parentInstance);
                 this.setLayoutOrder(instance, layoutOrder);
             }
 
@@ -687,8 +714,9 @@ export class Block extends AbstractBlock {
     }
 
     private mountBlockChild(block: Block, parent: Instance): Instance {
-        const { instance } = block.mountElementTree(block.r, parent);
+        const { instance } = this.mountElementTree(block.r, parent, false);
         block.l = instance;
+        block.v(parent);
         instanceBlockMap.set(instance, block);
         return instance;
     }
@@ -821,6 +849,12 @@ export class Block extends AbstractBlock {
         }
 
         entry.connections = connectionMap !== undefined && connectionMap.size() > 0 ? connectionMap : undefined;
+    }
+
+    private moveInstanceToParent(instance: Instance, parent: Instance): void {
+        if (instance.Parent !== parent) {
+            instance.Parent = parent;
+        }
     }
 
     private createInstanceFromElement(
@@ -1055,197 +1089,6 @@ export function useFinePatchBlock<T extends unknown[]>(
     } as never);
     elementBlockMap.set(clonedElement, blockRef.current!);
     return clonedElement;
-}
-
-// Fine-grained patching functions - disabled for now to avoid compilation errors
-/*
-function getChangedDependencies(
-    prevDeps: unknown[],
-    nextDeps: unknown[],
-    patchInstructions: PatchInstruction[],
-): Array<{ index: number; key: string; value: unknown }> {
-    const changed: Array<{ index: number; key: string; value: unknown }> = [];
-
-    // Build a map of dependency keys to indices based on the assumption that
-    // dependencies are passed in a predictable order: [count, increment, decrement]
-    // This matches the generated code pattern
-    const dependencyKeyMap = new Map<string, number>();
-    
-    // Extract all unique dependency keys from patch instructions
-    const allKeys = new Set<string>();
-    for (const instruction of patchInstructions) {
-        for (const edit of instruction.edits) {
-            allKeys.add(edit.dependencyKey);
-        }
-    }
-    
-    // Map keys to indices based on order they appear
-    // This is a simplified approach - in practice, the transformer could provide this mapping
-    let keyIndex = 0;
-    for (const key of allKeys) {
-        dependencyKeyMap.set(key, keyIndex);
-        keyIndex++;
-    }
-
-    // Check which dependencies changed
-    for (let i = 0; i < math.max(prevDeps.size(), nextDeps.size()); i++) {
-        if (prevDeps[i] !== nextDeps[i]) {
-            // Find the dependency key for this index
-            let dependencyKey = `dep_${i}`;
-            for (const [key, index] of dependencyKeyMap) {
-                if (index === i) {
-                    dependencyKey = key;
-                    break;
-                }
-            }
-            
-            changed.push({
-                index: i,
-                key: dependencyKey,
-                value: nextDeps[i],
-            });
-        }
-    }
-
-    return changed;
-}
-
-/**
- * Applies fine-grained patches to a cached element
- */
-function applyFinePatch(
-    cached: FinePatchBlockInstance,
-    changedDependencies: Array<{ index: number; key: string; value: unknown }>,
-    newDependencies: unknown[],
-): ReactElement {
-    // Clone the cached element to avoid mutations
-    const clonedElement = cloneReactElement(cached.rootElement!);
-
-    // Apply patches based on changed dependencies
-    for (const changedDep of changedDependencies) {
-        // Find patch instructions that depend on this changed dependency
-        const relevantInstructions = cached.patchInstructions.filter((instruction) =>
-            instruction.edits.some((edit) => edit.dependencyKey === changedDep.key),
-        );
-
-        for (const instruction of relevantInstructions) {
-            applyPatchInstruction(clonedElement, instruction, newDependencies, changedDep);
-        }
-    }
-
-    // Update the cached element
-    cached.rootElement = clonedElement;
-
-    return clonedElement;
-}
-
-/**
- * Applies a single patch instruction to an element
- */
-function applyPatchInstruction(
-    element: ReactElement,
-    instruction: PatchInstruction,
-    dependencies: unknown[],
-    changedDep: { index: number; key: string; value: unknown },
-): void {
-    // Navigate to the target element using the element path
-    let targetElement = element;
-    
-    // Navigate through the element tree using the path
-    // Path [0, 1] means: child 0 of root, then child 1 of that element
-    for (let i = 0; i < instruction.elementPath.size(); i++) {
-        const pathIndex = instruction.elementPath[i];
-        const targetProps = targetElement.props as Record<string, unknown>;
-        
-        if (targetProps && targetProps.children) {
-            const children = typeIs(targetProps.children, "table")
-                ? (targetProps.children as unknown[])
-                : [targetProps.children];
-                
-            if (pathIndex < children.size() && children[pathIndex]) {
-                const child = children[pathIndex];
-                if (typeIs(child, "table") && typeIs((child as { props?: unknown }).props, "table")) {
-                    targetElement = child as ReactElement;
-                } else {
-                    // Can't navigate further - target element not found
-                    return;
-                }
-            } else {
-                // Invalid path - can't find target element
-                return;
-            }
-        } else {
-            // No children to navigate to
-            return;
-        }
-    }
-
-    // Apply edits to the target element
-    for (const edit of instruction.edits) {
-        if (edit.dependencyKey === changedDep.key) {
-            const targetElementProps = targetElement.props as Record<string, unknown>;
-
-            if (edit.type === EditType.Attribute || edit.type === EditType.Style) {
-                const propEdit = edit as PropEdit;
-                // Update the specific property
-                if (targetElementProps !== undefined) {
-                    // Handle special case for interpolated text
-                    if (propEdit.propName === "Text" && changedDep.key === "count") {
-                        targetElementProps[propEdit.propName] = `Count: ${changedDep.value}`;
-                    } else {
-                        targetElementProps[propEdit.propName] = changedDep.value;
-                    }
-                }
-            } else if (edit.type === EditType.Event) {
-                const propEdit = edit as PropEdit;
-                // Handle event properties (like MouseButton1Click)
-                if (targetElementProps !== undefined) {
-                    if (propEdit.propName === "Event") {
-                        // Find the specific event in the Event object
-                        const eventObj = targetElementProps.Event as Record<string, unknown> || {};
-                        
-                        // Map dependency key to actual event name
-                        if (changedDep.key === "increment") {
-                            eventObj.MouseButton1Click = changedDep.value;
-                        } else if (changedDep.key === "decrement") {
-                            eventObj.MouseButton1Click = changedDep.value;
-                        } else {
-                            // Generic event handler
-                            eventObj[changedDep.key] = changedDep.value;
-                        }
-                        
-                        targetElementProps.Event = eventObj;
-                    } else {
-                        // Direct event prop (less common in Roblox)
-                        targetElementProps[propEdit.propName] = changedDep.value;
-                    }
-                }
-            } else if (edit.type === EditType.Child) {
-                const childEdit = edit as ChildEdit;
-                // Update the specific child
-                if (targetElementProps !== undefined && targetElementProps.children !== undefined) {
-                    const children = typeIs(targetElementProps.children, "table")
-                        ? (targetElementProps.children as unknown[])
-                        : [targetElementProps.children];
-
-                    if (childEdit.index < children.size()) {
-                        children[childEdit.index] = changedDep.value;
-                        targetElementProps.children = children.size() === 1 ? children[0] : children;
-                    }
-                }
-            }
-        }
-    }
-}
-
-/**
- * Clones a React element for safe mutation
- */
-function cloneReactElement(element: ReactElement): ReactElement {
-    return {
-        ...element,
-        props: element.props ? table.clone(element.props) : {},
-    };
 }
 
 /**

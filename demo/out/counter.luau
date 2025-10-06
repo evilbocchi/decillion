@@ -7,31 +7,31 @@ local _react = TS.import(script, game:GetService("ReplicatedStorage"), "rbxts_in
 local React = _react
 local useState = _react.useState
 -- Static declarations - extracted from render functions for optimal performance
-local STATIC_PROPS_TEXTLABEL_tu7ji1 = {
+local STATIC_PROPS_TEXTLABEL_mvzazr = {
 	Text = "Optimized Counter App",
 	TextColor3 = Color3.fromRGB(255, 255, 255),
 	BackgroundTransparency = 1,
 	Size = UDim2.new(1, 0, 1, 0),
 }
-local STATIC_PROPS_TEXTLABEL_tiqu5o = {
+local STATIC_PROPS_TEXTLABEL_84hnbe = {
 	Text = "Performance: Decillion Optimized",
 	TextColor3 = Color3.fromRGB(200, 200, 200),
 	BackgroundTransparency = 1,
 	Size = UDim2.new(1, 0, 1, 0),
 }
-local STATIC_PROPS_FRAME_5ev7za = {
+local STATIC_PROPS_FRAME_nn83am = {
 	BackgroundColor3 = Color3.fromRGB(50, 50, 50),
 	Size = UDim2.new(1, 0, 0, 50),
 }
-local STATIC_PROPS_FRAME_cqwet5 = {
+local STATIC_PROPS_FRAME_4d1xrf = {
 	Size = UDim2.new(1, 0, 0, 100),
 	Position = UDim2.new(0, 0, 0, 160),
 	BackgroundColor3 = Color3.fromRGB(60, 60, 60),
 }
-local STATIC_ELEMENT_TEXTLABEL_d6sm2s = createStaticElement("TextLabel", STATIC_PROPS_TEXTLABEL_tu7ji1)
-local STATIC_ELEMENT_FRAME_em50p0 = createStaticElement("Frame", STATIC_PROPS_FRAME_5ev7za, STATIC_ELEMENT_TEXTLABEL_d6sm2s)
-local STATIC_ELEMENT_TEXTLABEL_lcnise = createStaticElement("TextLabel", STATIC_PROPS_TEXTLABEL_tiqu5o)
-local STATIC_ELEMENT_FRAME_5zy1mv = createStaticElement("Frame", STATIC_PROPS_FRAME_cqwet5, STATIC_ELEMENT_TEXTLABEL_lcnise)
+local STATIC_ELEMENT_TEXTLABEL_5l5ba8 = createStaticElement("TextLabel", STATIC_PROPS_TEXTLABEL_mvzazr)
+local STATIC_ELEMENT_FRAME_fviyte = createStaticElement("Frame", STATIC_PROPS_FRAME_nn83am, STATIC_ELEMENT_TEXTLABEL_5l5ba8)
+local STATIC_ELEMENT_TEXTLABEL_tt6if4 = createStaticElement("TextLabel", STATIC_PROPS_TEXTLABEL_84hnbe)
+local STATIC_ELEMENT_FRAME_r52mtr = createStaticElement("Frame", STATIC_PROPS_FRAME_4d1xrf, STATIC_ELEMENT_TEXTLABEL_tt6if4)
 local function Counter()
 	local count, setCount = useState(0)
 	local increment = function()
@@ -44,7 +44,7 @@ local function Counter()
 		return React.createElement("frame", {
 			Size = UDim2.new(1, 0, 1, 0),
 			BackgroundColor3 = Color3.fromRGB(30, 30, 30),
-		}, STATIC_ELEMENT_FRAME_em50p0, React.createElement("textlabel", {
+		}, STATIC_ELEMENT_FRAME_fviyte, React.createElement("textlabel", {
 			Text = `Count: {count}`,
 			TextColor3 = Color3.fromRGB(255, 255, 255),
 			BackgroundColor3 = Color3.fromRGB(100, 100, 100),
@@ -68,7 +68,7 @@ local function Counter()
 			Event = {
 				MouseButton1Click = decrement,
 			},
-		}), STATIC_ELEMENT_FRAME_5zy1mv)
+		}), STATIC_ELEMENT_FRAME_r52mtr)
 	end, { count, increment, decrement }, { {
 		elementPath = { 0, 1 },
 		edits = { {
@@ -93,7 +93,7 @@ local function Counter()
 			propName = "Event",
 			path = { 0, 3 },
 		} },
-	} }, "dynamic_frame_syza92pno")
+	} }, "dynamic_frame_socnhxd52")
 end
 return {
 	default = Counter,

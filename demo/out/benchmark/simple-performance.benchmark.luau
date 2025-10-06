@@ -7,14 +7,14 @@ local _react = TS.import(script, game:GetService("ReplicatedStorage"), "rbxts_in
 local React = _react
 local useState = _react.useState
 -- Static declarations - extracted from render functions for optimal performance
-local STATIC_PROPS_TEXTLABEL_yp7g1h = {
+local STATIC_PROPS_TEXTLABEL_ht6ore = {
 	Text = "Full re-render forces all items to recreate. Highlight-only should be much faster!",
 	Size = UDim2.new(1, 0, 0, 20),
 	Position = UDim2.new(0, 0, 0, 85),
 	TextColor3 = Color3.fromRGB(200, 200, 200),
 	BackgroundTransparency = 1,
 }
-local STATIC_ELEMENT_TEXTLABEL_ayibl5 = createStaticElement("TextLabel", STATIC_PROPS_TEXTLABEL_yp7g1h)
+local STATIC_ELEMENT_TEXTLABEL_jgwed2 = createStaticElement("TextLabel", STATIC_PROPS_TEXTLABEL_ht6ore)
 --[[
 	*
 	 * Simple Performance Test: Shows the clear difference between optimized and unoptimized rendering
@@ -67,7 +67,7 @@ local function OptimizedItem(_param)
 			propName = "Text",
 			path = { 0, 0 },
 		} },
-	} }, "dynamic_frame_mb7as5ths")
+	} }, "dynamic_frame_gd8cy41xf")
 end
 local function SimplePerformanceTest()
 	local itemCount, setItemCount = useState(500)
@@ -258,7 +258,7 @@ local function SimplePerformanceTest()
 						return setItemCount(if itemCount == 100 then 500 elseif itemCount == 500 then 1000 else 100)
 					end,
 				},
-			}), STATIC_ELEMENT_TEXTLABEL_ayibl5)
+			}), STATIC_ELEMENT_TEXTLABEL_jgwed2)
 		end, { itemCount, lastRenderTime, useOptimized, triggerRender, triggerHighlightOnly, runRenderConsistencyTest }, { {
 			elementPath = { 0, 0 },
 			edits = { {
@@ -312,7 +312,7 @@ local function SimplePerformanceTest()
 				propName = "Text",
 				path = { 0, 5 },
 			} },
-		} }, "dynamic_frame_5e6wiywug"), useFinePatchBlock(function(itemCount, items, ItemComponent)
+		} }, "dynamic_frame_rlr3wxpgl"), useFinePatchBlock(function(itemCount, items, ItemComponent)
 			local _exp = {
 				Size = UDim2.new(1, 0, 1, -110),
 				Position = UDim2.new(0, 0, 0, 110),
@@ -355,7 +355,7 @@ local function SimplePerformanceTest()
 				index = 1,
 				path = { 0, 1 },
 			} },
-		} }, "dynamic_scrollingframe_ss21xdwhl"))
+		} }, "dynamic_scrollingframe_py2km9h1j"))
 	end, { itemCount, lastRenderTime, useOptimized, triggerRender, triggerHighlightOnly, runRenderConsistencyTest, items, ItemComponent }, { {
 		elementPath = { 0, 0, 0 },
 		edits = { {
@@ -425,7 +425,7 @@ local function SimplePerformanceTest()
 			index = 1,
 			path = { 0, 1, 1 },
 		} },
-	} }, "dynamic_frame_w0url89le")
+	} }, "dynamic_frame_5gg78efci")
 end
 return {
 	default = SimplePerformanceTest,

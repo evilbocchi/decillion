@@ -231,6 +231,9 @@ export class BlockAnalyzer {
      */
     private extractDependencies(expr: ts.Expression, deps: string[], depTypes?: Map<string, DependencyInfo>): void {
         if (ts.isIdentifier(expr)) {
+            if (this.isIdentifierPartOfJsxIntrinsicTag(expr)) {
+                return;
+            }
             // Only add if not already present
             if (!deps.includes(expr.text)) {
                 deps.push(expr.text);
@@ -388,6 +391,41 @@ export class BlockAnalyzer {
                 this.extractDependencies(child, deps, depTypes);
             }
         });
+    }
+
+    private isIdentifierPartOfJsxIntrinsicTag(identifier: ts.Identifier): boolean {
+        let current: ts.Node | undefined = identifier;
+
+        while (current) {
+            const parent: ts.Node | undefined = current.parent;
+            if (!parent) {
+                break;
+            }
+
+            if (
+                (ts.isJsxOpeningElement(parent) ||
+                    ts.isJsxSelfClosingElement(parent) ||
+                    ts.isJsxClosingElement(parent)) &&
+                parent.tagName === current
+            ) {
+                const tagText = current.getText();
+                if (!tagText) {
+                    return false;
+                }
+
+                const firstChar = tagText[0];
+                return firstChar === firstChar.toLowerCase();
+            }
+
+            if (ts.isPropertyAccessExpression(parent) || ts.isQualifiedName(parent)) {
+                current = parent;
+                continue;
+            }
+
+            current = parent;
+        }
+
+        return false;
     }
 
     /**

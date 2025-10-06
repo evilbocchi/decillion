@@ -5,7 +5,7 @@
 ### **1. Core Runtime System**
 - [x] **Block Abstract Base Class** - ✅ `BlockInstance` interface and `useMemoizedBlock` (runtime/src/index.ts)
 - [x] **Block Factory System** - ✅ `createBlock` function creates reusable block instances
-- [ ] **Edit/Patch Instructions** - Data structure for describing UI changes
+- [x] **Edit/Patch Instructions** - ✅ Data structure for describing UI changes (PatchInstruction, PropEdit, ChildEdit, event edit logic in runtime/src/index.ts)
 - [x] **Instance Management** - ✅ Block cache system with `blockCache` and `dependencyCache`
 - [ ] **Template-to-Instance Conversion** - Convert template strings to Roblox instance hierarchies
 
@@ -20,7 +20,7 @@
 - [x] **Mount (`m`)** - ✅ `useMemoizedBlock` handles mounting with caching
 - [x] **Patch (`p`)** - ✅ `shouldUpdateBlock` handles prop comparison and updates
 - [x] **Remove (`x`)** - ✅ `clearBlockCache` handles cleanup
-- [ ] **Move (`v`)** - Reposition block in hierarchy
+- [x] **Move (`v`)** - ✅ Reposition block in hierarchy (Block.v and child diffing moves in runtime/src/index.ts)
 - [x] **ShouldUpdate (`u`)** - ✅ `shouldUpdateBlock` implements memoization logic
 
 ## **🎯 PHASE 2: COMPILER MAGIC (Optimization Engine)**
@@ -54,7 +54,7 @@
 - [x] **Property Batching** - ✅ `createPropsObject` groups property updates efficiently
 - [x] **Event Handler Pooling** - ✅ Event handlers extracted and memoized with blocks
 - [x] **Instance Recycling** - ✅ Block cache system reuses instances when possible
-- [ ] **Layout Optimization** - Minimize layout recalculations
+- [x] **Layout Optimization** - ✅ Minimize layout recalculations (LayoutOrder diffing and patching in runtime/src/index.ts)
 
 ### **9. Development Experience**
 - [x] **Error Handling & Debugging** - ✅ Try-catch blocks and debug logging in transformer
