@@ -28,7 +28,6 @@ This project aims to bring Million.js-style UI optimization to Roblox-TS:
 6. **Developer Ergonomics**  
    - Prioritize clear, maintainable, and easy-to-use APIs.
    - Provide usage examples and comments in suggestions.
-   - Prefer VS Code Tasks over using CLI or manual scripts.
 
 # 🚀 Million.js-Style Roblox-TS Renderer: The Gameplan
 

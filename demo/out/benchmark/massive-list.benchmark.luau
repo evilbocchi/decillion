@@ -79,7 +79,7 @@ local function OptimizedListItem(_param)
 			propName = "Text",
 			path = { 0, 1 },
 		} },
-	} }, "dynamic_frame_6kqj1ny6s")
+	} }, "dynamic_frame_6lm1srmud")
 end
 local function MassiveListBenchmark()
 	local itemCount, setItemCount = useState(1000)
@@ -210,7 +210,7 @@ local function MassiveListBenchmark()
 				propName = "Text",
 				path = { 0, 4 },
 			} },
-		} }, "dynamic_frame_ijfrbd1kv"), useFinePatchBlock(function(itemCount, items, ListComponent)
+		} }, "dynamic_frame_8kc3bu7go"), useFinePatchBlock(function(itemCount, items, ListComponent)
 			local _exp = {
 				Size = UDim2.new(1, 0, 1, -100),
 				Position = UDim2.new(0, 0, 0, 100),
@@ -254,7 +254,7 @@ local function MassiveListBenchmark()
 				index = 1,
 				path = { 0, 1 },
 			} },
-		} }, "dynamic_scrollingframe_9nkf14sc2"))
+		} }, "dynamic_scrollingframe_16uctvp6a"))
 	end, { itemCount, useOptimized, triggerUpdate, renderTime, items, ListComponent }, { {
 		elementPath = { 0, 0, 0 },
 		edits = { {
@@ -316,7 +316,7 @@ local function MassiveListBenchmark()
 			index = 1,
 			path = { 0, 1, 1 },
 		} },
-	} }, "dynamic_frame_6k8i4lvia")
+	} }, "dynamic_frame_74cgjugo3")
 end
 -- Alternative ways to use @undecillion
 -- Comment-style for arrow functions

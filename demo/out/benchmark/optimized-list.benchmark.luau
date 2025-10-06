@@ -8,14 +8,14 @@ local React = _react
 local useState = _react.useState
 local useEffect = _react.useEffect
 -- Static declarations - extracted from render functions for optimal performance
-local STATIC_PROPS_TEXTBUTTON_vlmv01 = {
+local STATIC_PROPS_TEXTBUTTON_2vpehr = {
 	Text = "Toggle First Item",
 	Size = UDim2.new(0.25, 0, 0, 25),
 	Position = UDim2.new(0.5, 0, 0, 30),
 	BackgroundColor3 = Color3.fromRGB(150, 100, 100),
 	TextColor3 = Color3.fromRGB(255, 255, 255),
 }
-local STATIC_PROPS_TEXTLABEL_24k0mj = {
+local STATIC_PROPS_TEXTLABEL_d3oofo = {
 	Text = "Click individual items to toggle them. Notice how Decillion only updates changed items.",
 	Size = UDim2.new(1, 0, 0, 50),
 	Position = UDim2.new(0, 0, 0, 60),
@@ -23,8 +23,8 @@ local STATIC_PROPS_TEXTLABEL_24k0mj = {
 	BackgroundTransparency = 1,
 	TextWrapped = true,
 }
-local STATIC_ELEMENT_TEXTBUTTON_gcu5ea = createStaticElement("TextButton", STATIC_PROPS_TEXTBUTTON_vlmv01)
-local STATIC_ELEMENT_TEXTLABEL_vxbyj3 = createStaticElement("TextLabel", STATIC_PROPS_TEXTLABEL_24k0mj)
+local STATIC_ELEMENT_TEXTBUTTON_iqiol1 = createStaticElement("TextButton", STATIC_PROPS_TEXTBUTTON_2vpehr)
+local STATIC_ELEMENT_TEXTLABEL_bo8odx = createStaticElement("TextLabel", STATIC_PROPS_TEXTLABEL_d3oofo)
 --[[
 	*
 	 * Advanced List Optimization Benchmark
@@ -88,7 +88,7 @@ local function TraditionalListItem(_param)
 			propName = "BackgroundColor3",
 			path = { 0, 1 },
 		} },
-	} }, "dynamic_frame_p80rkkbxz")
+	} }, "dynamic_frame_xxelpucng")
 end
 -- Decillion optimized approach
 local function OptimizedListItem(_param)
@@ -147,7 +147,7 @@ local function OptimizedListItem(_param)
 			propName = "BackgroundColor3",
 			path = { 0, 1 },
 		} },
-	} }, "dynamic_frame_i9i06fude")
+	} }, "dynamic_frame_qnb5i4u6q")
 end
 local function OptimizedListBenchmark()
 	local itemCount, setItemCount = useState(100)
@@ -260,7 +260,7 @@ local function OptimizedListBenchmark()
 				Event = {
 					MouseButton1Click = triggerFullRerender,
 				},
-			}), STATIC_ELEMENT_TEXTBUTTON_gcu5ea, React.createElement("textbutton", {
+			}), STATIC_ELEMENT_TEXTBUTTON_iqiol1, React.createElement("textbutton", {
 				Text = `Items: {itemCount}`,
 				Size = UDim2.new(0.25, 0, 0, 25),
 				Position = UDim2.new(0.75, 0, 0, 30),
@@ -271,7 +271,7 @@ local function OptimizedListBenchmark()
 						return setItemCount(if itemCount == 100 then 500 elseif itemCount == 500 then 1000 else 100)
 					end,
 				},
-			}), STATIC_ELEMENT_TEXTLABEL_vxbyj3)
+			}), STATIC_ELEMENT_TEXTLABEL_bo8odx)
 		end, { itemCount, renderCount, useOptimized, triggerFullRerender }, { {
 			elementPath = { 0, 0 },
 			edits = { {
@@ -309,7 +309,7 @@ local function OptimizedListBenchmark()
 				propName = "Text",
 				path = { 0, 4 },
 			} },
-		} }, "dynamic_frame_yoozgqlvg"), useFinePatchBlock(function(itemCount, items, ListComponent)
+		} }, "dynamic_frame_jn48g58j8"), useFinePatchBlock(function(itemCount, items, ListComponent)
 			local _exp = {
 				Size = UDim2.new(1, 0, 1, -120),
 				Position = UDim2.new(0, 0, 0, 120),
@@ -354,7 +354,7 @@ local function OptimizedListBenchmark()
 				index = 1,
 				path = { 0, 1 },
 			} },
-		} }, "dynamic_scrollingframe_llyauikz2"))
+		} }, "dynamic_scrollingframe_glrn9nr5n"))
 	end, { itemCount, renderCount, useOptimized, triggerFullRerender, items, ListComponent }, { {
 		elementPath = { 0, 0, 0 },
 		edits = { {
@@ -408,7 +408,7 @@ local function OptimizedListBenchmark()
 			index = 1,
 			path = { 0, 1, 1 },
 		} },
-	} }, "dynamic_frame_eewgk54yp")
+	} }, "dynamic_frame_3sblqfb7s")
 end
 return {
 	default = OptimizedListBenchmark,

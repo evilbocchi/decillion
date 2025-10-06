@@ -7,14 +7,14 @@ local _react = TS.import(script, game:GetService("ReplicatedStorage"), "rbxts_in
 local React = _react
 local useState = _react.useState
 -- Static declarations - extracted from render functions for optimal performance
-local STATIC_PROPS_TEXTLABEL_phdbj7 = {
+local STATIC_PROPS_TEXTLABEL_yp7g1h = {
 	Text = "Full re-render forces all items to recreate. Highlight-only should be much faster!",
 	Size = UDim2.new(1, 0, 0, 20),
 	Position = UDim2.new(0, 0, 0, 85),
 	TextColor3 = Color3.fromRGB(200, 200, 200),
 	BackgroundTransparency = 1,
 }
-local STATIC_ELEMENT_TEXTLABEL_j50j3c = createStaticElement("TextLabel", STATIC_PROPS_TEXTLABEL_phdbj7)
+local STATIC_ELEMENT_TEXTLABEL_ayibl5 = createStaticElement("TextLabel", STATIC_PROPS_TEXTLABEL_yp7g1h)
 --[[
 	*
 	 * Simple Performance Test: Shows the clear difference between optimized and unoptimized rendering
@@ -67,7 +67,7 @@ local function OptimizedItem(_param)
 			propName = "Text",
 			path = { 0, 0 },
 		} },
-	} }, "dynamic_frame_jpwkoi7l8")
+	} }, "dynamic_frame_mb7as5ths")
 end
 local function SimplePerformanceTest()
 	local itemCount, setItemCount = useState(500)
@@ -98,7 +98,7 @@ local function SimplePerformanceTest()
 		end
 	end
 	local triggerRender = function()
-		local start = tick()
+		local start = os.clock()
 		-- Update states - React should batch these automatically in modern versions
 		setRenderTrigger(renderTrigger + 1)
 		setHighlightIndex((highlightIndex + 1) % itemCount)
@@ -106,27 +106,101 @@ local function SimplePerformanceTest()
 		task.spawn(function()
 			task.wait()
 			task.wait()
-			local elapsed = (tick() - start) * 1000
+			local elapsed = (os.clock() - start) * 1000
 			setLastRenderTime(elapsed)
 			print(`Render time: {string.format("%.2f", elapsed)}ms ({if useOptimized then "Optimized" else "Unoptimized"}) - Items: {itemCount}`)
 		end)
 	end
+	-- Add this inside your SimplePerformanceTest component
+	local function runRenderConsistencyTest()
+		local testCounts = { 100, 500, 1000 }
+		local runsPerCount = 10
+		local currentCountIndex = 0
+		local run = 0
+		local times = {}
+		local function nextTest()
+			if run >= runsPerCount then
+				-- Calculate stats
+				-- ▼ ReadonlyArray.reduce ▼
+				local _result = 0
+				local _callback = function(a, b)
+					return a + b
+				end
+				for _i = 1, #times do
+					_result = _callback(_result, times[_i], _i - 1, times)
+				end
+				-- ▲ ReadonlyArray.reduce ▲
+				local avg = _result / #times
+				-- ▼ ReadonlyArray.reduce ▼
+				local _result_1 = 0
+				local _callback_1 = function(a, b)
+					return a + math.pow(b - avg, 2)
+				end
+				for _i = 1, #times do
+					_result_1 = _callback_1(_result_1, times[_i], _i - 1, times)
+				end
+				-- ▲ ReadonlyArray.reduce ▲
+				local std = math.sqrt(_result_1 / #times)
+				local _exp = testCounts[currentCountIndex + 1]
+				local _exp_1 = math.floor(avg * 100) / 100
+				local _exp_2 = math.floor(std * 100) / 100
+				-- ▼ ReadonlyArray.map ▼
+				local _newValue = table.create(#times)
+				local _callback_2 = function(t)
+					return math.floor(t * 100) / 100
+				end
+				for _k, _v in times do
+					_newValue[_k] = _callback_2(_v, _k - 1, times)
+				end
+				-- ▲ ReadonlyArray.map ▲
+				print(`ItemCount: {_exp}, Avg: {_exp_1}ms, StdDev: {_exp_2}ms, Times: [{table.concat(_newValue, ", ")}]`)
+				-- Next item count
+				currentCountIndex += 1
+				run = 0
+				times = {}
+				if currentCountIndex >= #testCounts then
+					print("Render consistency test complete.")
+					return nil
+				end
+				setItemCount(testCounts[currentCountIndex + 1])
+				task.wait(0.5)
+			end
+			-- Trigger render and measure
+			local start = os.clock()
+			setRenderTrigger(function(r)
+				return r + 1
+			end)
+			setHighlightIndex((highlightIndex + 1) % testCounts[currentCountIndex + 1])
+			task.spawn(function()
+				task.wait()
+				task.wait()
+				local elapsed = (os.clock() - start) * 1000
+				table.insert(times, elapsed)
+				run += 1
+				nextTest()
+			end)
+		end
+		-- Start test
+		setItemCount(testCounts[1])
+		task.wait(0.5)
+		nextTest()
+	end
 	-- Test just highlight changes (should be much faster)
 	local triggerHighlightOnly = function()
-		local start = tick()
+		local start = os.clock()
 		setHighlightIndex((highlightIndex + 1) % itemCount)
 		task.spawn(function()
 			task.wait()
-			local elapsed = (tick() - start) * 1000
+			local elapsed = (os.clock() - start) * 1000
 			print(`Highlight-only time: {string.format("%.2f", elapsed)}ms ({if useOptimized then "Optimized" else "Unoptimized"}) - Items: {itemCount}`)
 		end)
 	end
 	local ItemComponent = if useOptimized then OptimizedItem else UnoptimizedItem
-	return useFinePatchBlock(function(itemCount, lastRenderTime, useOptimized, triggerRender, triggerHighlightOnly, items, ItemComponent)
+	return useFinePatchBlock(function(itemCount, lastRenderTime, useOptimized, triggerRender, triggerHighlightOnly, runRenderConsistencyTest, items, ItemComponent)
 		return React.createElement("frame", {
 			Size = UDim2.new(1, 0, 1, 0),
 			BackgroundColor3 = Color3.fromRGB(20, 20, 20),
-		}, useFinePatchBlock(function(itemCount, lastRenderTime, useOptimized, triggerRender, triggerHighlightOnly)
+		}, useFinePatchBlock(function(itemCount, lastRenderTime, useOptimized, triggerRender, triggerHighlightOnly, runRenderConsistencyTest)
 			return React.createElement("frame", {
 				Size = UDim2.new(1, 0, 0, 110),
 				BackgroundColor3 = Color3.fromRGB(40, 40, 40),
@@ -165,6 +239,15 @@ local function SimplePerformanceTest()
 					MouseButton1Click = triggerHighlightOnly,
 				},
 			}), React.createElement("textbutton", {
+				Text = "Run Consistency Benchmark",
+				Size = UDim2.new(0.3, 0, 0, 25),
+				Position = UDim2.new(0, 0, 0, 90),
+				BackgroundColor3 = Color3.fromRGB(80, 80, 180),
+				TextColor3 = Color3.fromRGB(255, 255, 255),
+				Event = {
+					MouseButton1Click = runRenderConsistencyTest,
+				},
+			}), React.createElement("textbutton", {
 				Text = `Items: {itemCount}`,
 				Size = UDim2.new(0.3, 0, 0, 25),
 				Position = UDim2.new(0, 0, 0, 60),
@@ -175,8 +258,8 @@ local function SimplePerformanceTest()
 						return setItemCount(if itemCount == 100 then 500 elseif itemCount == 500 then 1000 else 100)
 					end,
 				},
-			}), STATIC_ELEMENT_TEXTLABEL_j50j3c)
-		end, { itemCount, lastRenderTime, useOptimized, triggerRender, triggerHighlightOnly }, { {
+			}), STATIC_ELEMENT_TEXTLABEL_ayibl5)
+		end, { itemCount, lastRenderTime, useOptimized, triggerRender, triggerHighlightOnly, runRenderConsistencyTest }, { {
 			elementPath = { 0, 0 },
 			edits = { {
 				type = 1,
@@ -216,12 +299,20 @@ local function SimplePerformanceTest()
 		}, {
 			elementPath = { 0, 4 },
 			edits = { {
+				type = 4,
+				dependencyKey = "runRenderConsistencyTest",
+				propName = "Event",
+				path = { 0, 4 },
+			} },
+		}, {
+			elementPath = { 0, 5 },
+			edits = { {
 				type = 1,
 				dependencyKey = "itemCount",
 				propName = "Text",
-				path = { 0, 4 },
+				path = { 0, 5 },
 			} },
-		} }, "dynamic_frame_k2z0y3h71"), useFinePatchBlock(function(itemCount, items, ItemComponent)
+		} }, "dynamic_frame_5e6wiywug"), useFinePatchBlock(function(itemCount, items, ItemComponent)
 			local _exp = {
 				Size = UDim2.new(1, 0, 1, -110),
 				Position = UDim2.new(0, 0, 0, 110),
@@ -264,8 +355,8 @@ local function SimplePerformanceTest()
 				index = 1,
 				path = { 0, 1 },
 			} },
-		} }, "dynamic_scrollingframe_rs66knlno"))
-	end, { itemCount, lastRenderTime, useOptimized, triggerRender, triggerHighlightOnly, items, ItemComponent }, { {
+		} }, "dynamic_scrollingframe_ss21xdwhl"))
+	end, { itemCount, lastRenderTime, useOptimized, triggerRender, triggerHighlightOnly, runRenderConsistencyTest, items, ItemComponent }, { {
 		elementPath = { 0, 0, 0 },
 		edits = { {
 			type = 1,
@@ -305,10 +396,18 @@ local function SimplePerformanceTest()
 	}, {
 		elementPath = { 0, 0, 4 },
 		edits = { {
+			type = 4,
+			dependencyKey = "runRenderConsistencyTest",
+			propName = "Event",
+			path = { 0, 0, 4 },
+		} },
+	}, {
+		elementPath = { 0, 0, 5 },
+		edits = { {
 			type = 1,
 			dependencyKey = "itemCount",
 			propName = "Text",
-			path = { 0, 0, 4 },
+			path = { 0, 0, 5 },
 		} },
 	}, {
 		elementPath = { 0, 1 },
@@ -326,7 +425,7 @@ local function SimplePerformanceTest()
 			index = 1,
 			path = { 0, 1, 1 },
 		} },
-	} }, "dynamic_frame_sojph71co")
+	} }, "dynamic_frame_w0url89le")
 end
 return {
 	default = SimplePerformanceTest,
