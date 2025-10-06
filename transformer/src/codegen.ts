@@ -48,6 +48,13 @@ export function generateBlockId(tagName: string): string {
 }
 
 /**
+ * Generates a unique static instance factory identifier
+ */
+export function generateStaticInstanceFactoryId(tagName: string): string {
+    return `STATIC_INSTANCE_${tagName.toUpperCase()}_${Math.random().toString(36).substr(2, 6)}`;
+}
+
+/**
  * Creates the appropriate tag reference for React calls
  * - Lowercase tags (frame, textlabel) become string literals
  * - PascalCase tags (Counter, MyComponent) become identifiers

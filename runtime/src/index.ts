@@ -52,6 +52,16 @@ const HttpService = game.GetService("HttpService");
 // https://github.com/jsdotlua/react-lua/blob/main/modules/shared/src/ReactSymbols.luau
 const REACT_ELEMENT_TYPE = 0xeac7;
 
+const STATIC_INSTANCE_KEY = "__decillionCreateInstance" as const;
+const STATIC_TEMPLATE_KEY = "__decillionInstanceTemplate" as const;
+
+export type StaticInstanceFactory = (parent?: Instance) => Instance;
+
+type StaticReactElement = ReactElement & {
+    [STATIC_INSTANCE_KEY]?: StaticInstanceFactory;
+    [STATIC_TEMPLATE_KEY]?: Instance;
+};
+
 // Edit types for fine-grained updates (following Million.js Flags pattern)
 export const enum EditType {
     Attribute = 1,
@@ -164,6 +174,116 @@ function createRobloxInstance(element: ReactElement, parent: Instance): Instance
 
     instance.Parent = parent;
     return instance;
+}
+
+function isStaticReactElement(value: unknown): value is StaticReactElement {
+    if (!typeIs(value, "table")) {
+        return false;
+    }
+
+    const candidate = value as Record<string, unknown>;
+    return candidate["$$typeof"] === REACT_ELEMENT_TYPE;
+}
+
+function collectStaticChildren(props: Record<string, unknown>): unknown[] {
+    const container = props.Children ?? props.children;
+    if (container === undefined) {
+        return [];
+    }
+
+    if (!typeIs(container, "table")) {
+        return [container];
+    }
+
+    const result: unknown[] = [];
+    let index = 0;
+
+    for (const child of container as unknown[]) {
+        result[index++] = child;
+    }
+
+    if (index > 0) {
+        return result;
+    }
+
+    for (const [, child] of pairs(container as Record<string, unknown>)) {
+        result[index++] = child;
+    }
+
+    return result;
+}
+
+function applyStaticPropsToInstance(instance: Instance, props: Record<string, unknown>): void {
+    for (const [propName, value] of pairs(props)) {
+        if (
+            propName === "Children" ||
+            propName === "children" ||
+            propName === "Event" ||
+            propName === "Ref" ||
+            propName === "Parent"
+        ) {
+            continue;
+        }
+
+        (instance as unknown as Record<string, unknown>)[propName] = value;
+    }
+}
+
+function buildStaticInstanceTemplate(element: StaticReactElement): Instance {
+    const elementType = element.type;
+    if (typeIs(elementType, "string") === false) {
+        throw `Static element must resolve to a Roblox Instance type, received ${typeOf(elementType)}`;
+    }
+
+    const instance = new Instance(elementType as keyof CreatableInstances);
+    const props = element.props as Record<string, unknown> | undefined;
+
+    if (props !== undefined) {
+        applyStaticPropsToInstance(instance, props);
+
+        const children = collectStaticChildren(props);
+        for (const child of children) {
+            if (!isStaticReactElement(child)) {
+                continue;
+            }
+
+            const childInstance = buildStaticInstanceTemplate(child);
+            childInstance.Parent = instance;
+        }
+    }
+
+    instance.Parent = undefined;
+    return instance;
+}
+
+function ensureStaticInstanceTemplate(element: StaticReactElement): Instance {
+    const existing = element[STATIC_TEMPLATE_KEY];
+    if (existing !== undefined) {
+        return existing;
+    }
+
+    const template = buildStaticInstanceTemplate(element);
+    element[STATIC_TEMPLATE_KEY] = template;
+    return template;
+}
+
+function ensureStaticInstanceFactory(element: StaticReactElement): StaticInstanceFactory {
+    const existing = element[STATIC_INSTANCE_KEY];
+    if (existing !== undefined) {
+        return existing;
+    }
+
+    const template = ensureStaticInstanceTemplate(element);
+    const factory: StaticInstanceFactory = (parent?: Instance) => {
+        const clone = template.Clone();
+        if (parent !== undefined) {
+            clone.Parent = parent;
+        }
+        return clone;
+    };
+
+    element[STATIC_INSTANCE_KEY] = factory;
+    return factory;
 }
 
 /**
@@ -585,6 +705,7 @@ export class Block extends AbstractBlock {
             const block = elementBlockMap.get(element);
             const key = this.getElementKey(element, i - startIndex);
             if (block !== undefined) {
+                block.k = key;
                 collected.push({
                     key,
                     node: {
@@ -605,6 +726,107 @@ export class Block extends AbstractBlock {
         return collected;
     }
 
+    private syncChildEntry(
+        parentInstance: Instance,
+        existing: ChildEntry | undefined,
+        child: { key: string; node: ChildNode },
+    ): ChildEntry {
+        let entry = existing;
+        if (entry === undefined) {
+            entry = { key: child.key };
+        }
+
+        entry.key = child.key;
+
+        if (child.node.type === "block") {
+            if (entry.block !== undefined && entry.block !== child.node.block) {
+                entry.block.x();
+                entry.block = undefined;
+                if (entry.instance !== undefined) {
+                    instanceBlockMap.delete(entry.instance);
+                    entry.instance = undefined;
+                }
+            }
+
+            if (entry.element !== undefined && entry.instance !== undefined) {
+                this.clearEventConnectionsForInstance(entry.instance, entry.connections);
+                if (entry.connections !== undefined) {
+                    entry.connections.forEach((record) => record.connection.Disconnect());
+                    entry.connections.clear();
+                    entry.connections = undefined;
+                }
+                entry.instance.Destroy();
+                entry.instance = undefined;
+                entry.element = undefined;
+            }
+
+            entry.block = child.node.block;
+            entry.element = undefined;
+            const blockInstance = child.node.block.l ?? this.mountBlockChild(child.node.block, parentInstance);
+            entry.instance = blockInstance;
+            instanceBlockMap.set(blockInstance, child.node.block);
+            child.node.block.v(parentInstance);
+        } else {
+            const element = child.node.element;
+
+            if (entry.block !== undefined) {
+                entry.block.x();
+                entry.block = undefined;
+                if (entry.instance !== undefined) {
+                    instanceBlockMap.delete(entry.instance);
+                    entry.instance = undefined;
+                }
+            }
+
+            entry.element = element;
+
+            if (entry.instance === undefined || entry.instance.Parent === undefined) {
+                if (entry.connections !== undefined) {
+                    entry.connections.forEach((record) => record.connection.Disconnect());
+                    entry.connections.clear();
+                    entry.connections = undefined;
+                }
+
+                const { instance: mountedInstance, connections } = this.mountElementTree(element, parentInstance, false);
+                entry.instance = mountedInstance;
+                entry.connections = connections;
+            } else {
+                this.updateElementInstance(entry, element);
+            }
+
+            if (entry.instance !== undefined) {
+                this.moveInstanceToParent(entry.instance, parentInstance);
+            }
+        }
+
+        return entry;
+    }
+
+    private cleanupChildEntry(entry: ChildEntry): void {
+        if (entry.block !== undefined) {
+            entry.block.x();
+            entry.block = undefined;
+            entry.instance = undefined;
+        }
+
+        if (entry.instance !== undefined) {
+            instanceBlockMap.delete(entry.instance);
+            this.clearEventConnectionsForInstance(entry.instance, entry.connections);
+            if (entry.connections !== undefined) {
+                entry.connections.forEach((record) => record.connection.Disconnect());
+                entry.connections.clear();
+            }
+            entry.instance.Destroy();
+            entry.instance = undefined;
+        } else if (entry.connections !== undefined) {
+            entry.connections.forEach((record) => record.connection.Disconnect());
+            entry.connections.clear();
+        }
+
+        entry.connections = undefined;
+        entry.element = undefined;
+    }
+
     private getElementKey(element: ReactElement, fallbackIndex: number): string {
         const key = (element as unknown as { key?: string | number }).key;
         if (key !== undefined) {
@@ -621,96 +843,138 @@ export class Block extends AbstractBlock {
     ): void {
         this.hydrateRegionEntries(region, parentInstance);
 
-        const oldEntries = region.entries;
+        const oldOrder = region.orderedKeys.map((key) => ({ key, entry: region.entries.get(key) }));
         const newEntries = new Map<string, ChildEntry>();
-        const removedKeys = new Set<string>();
+        const nextOrder: string[] = new Array(newChildren.size());
 
-        oldEntries.forEach((_value, key) => {
-            removedKeys.add(key);
-        });
+        let oldHead = 0;
+        let newHead = 0;
+        let oldTail = oldOrder.size() - 1;
+        let newTail = newChildren.size() - 1;
 
-        let layoutOrder = region.startIndex;
+        const consumedOld = new Set<number>();
 
-        for (const newChild of newChildren) {
-            removedKeys.delete(newChild.key);
+        const capture = (index: number, key: string, entry: ChildEntry) => {
+            newEntries.set(key, entry);
+            nextOrder[index] = key;
+        };
 
-            let entry = oldEntries.get(newChild.key);
-            if (entry === undefined) {
-                entry = {
-                    key: newChild.key,
-                };
+        const syncAndCapture = (targetIndex: number, sourceIndex: number, child: { key: string; node: ChildNode }) => {
+            const source = oldOrder[sourceIndex]?.entry;
+            if (source !== undefined) {
+                consumedOld.add(sourceIndex);
             }
 
-            if (newChild.node.type === "block") {
-                if (entry.connections !== undefined) {
-                    entry.connections.forEach((record) => {
-                        record.connection.Disconnect();
-                    });
-                    entry.connections.clear();
-                    entry.connections = undefined;
-                }
-                entry.block = newChild.node.block;
-                if (entry.instance === undefined || entry.instance !== newChild.node.block.l) {
-                    const blockInstance = newChild.node.block.l ?? this.mountBlockChild(newChild.node.block, parentInstance);
-                    entry.instance = blockInstance;
-                    instanceBlockMap.set(blockInstance, newChild.node.block);
-                }
-                newChild.node.block.v(parentInstance);
-            } else {
-                entry.block = undefined;
-                entry.element = newChild.node.element;
+            const entry = this.syncChildEntry(parentInstance, source, child);
+            capture(targetIndex, child.key, entry);
+        };
 
-                if (entry.instance === undefined) {
-                    const { instance: mountedInstance, connections } = this.mountElementTree(
-                        newChild.node.element,
-                        parentInstance,
-                        false,
-                    );
-                    entry.instance = mountedInstance;
-                    entry.connections = connections;
-                } else {
-                    this.updateElementInstance(entry, newChild.node.element);
-                }
-
-                if (entry.instance !== undefined) {
-                    this.moveInstanceToParent(entry.instance, parentInstance);
-                }
+        while (oldHead <= oldTail && newHead <= newTail) {
+            while (oldHead <= oldTail && consumedOld.has(oldHead)) {
+                oldHead++;
+            }
+            while (oldHead <= oldTail && oldOrder[oldHead]?.entry === undefined) {
+                oldHead++;
+            }
+            while (oldTail >= oldHead && consumedOld.has(oldTail)) {
+                oldTail--;
+            }
+            while (oldTail >= oldHead && oldOrder[oldTail]?.entry === undefined) {
+                oldTail--;
+            }
+            if (oldHead > oldTail || newHead > newTail) {
+                break;
             }
 
-            newEntries.set(newChild.key, entry);
+            const oldHeadItem = oldOrder[oldHead]!;
+            const oldTailItem = oldOrder[oldTail]!;
+            const newHeadChild = newChildren[newHead]!;
+            const newTailChild = newChildren[newTail]!;
 
-            const instance = entry.block?.l ?? entry.instance;
-            if (instance !== undefined) {
-                this.moveInstanceToParent(instance, parentInstance);
-                this.setLayoutOrder(instance, layoutOrder);
+            if (oldHeadItem.key === newHeadChild.key) {
+                syncAndCapture(newHead, oldHead, newHeadChild);
+                oldHead++;
+                newHead++;
+                continue;
             }
 
-            layoutOrder++;
+            if (oldTailItem.key === newTailChild.key) {
+                syncAndCapture(newTail, oldTail, newTailChild);
+                oldTail--;
+                newTail--;
+                continue;
+            }
+
+            if (oldHeadItem.key === newTailChild.key) {
+                syncAndCapture(newTail, oldHead, newTailChild);
+                consumedOld.add(oldHead);
+                newTail--;
+                continue;
+            }
+
+            if (oldTailItem.key === newHeadChild.key) {
+                syncAndCapture(newHead, oldTail, newHeadChild);
+                consumedOld.add(oldTail);
+                newHead++;
+                continue;
+            }
+
+            break;
         }
 
-        removedKeys.forEach((key) => {
-            const entry = oldEntries.get(key);
-            if (entry === undefined) {
-                return;
+        if (newHead <= newTail) {
+            const remainingOld = new Map<string, ChildEntry>();
+            for (let i = oldHead; i <= oldTail; i++) {
+                if (consumedOld.has(i)) {
+                    continue;
+                }
+                const candidate = oldOrder[i];
+                if (candidate?.entry !== undefined) {
+                    remainingOld.set(candidate.key, candidate.entry);
+                }
             }
 
-            if (entry.block !== undefined) {
-                entry.block.x();
-            } else if (entry.instance !== undefined) {
-                instanceBlockMap.delete(entry.instance);
-                this.clearEventConnectionsForInstance(entry.instance);
-                if (entry.connections !== undefined) {
-                    entry.connections.forEach((record) => {
-                        record.connection.Disconnect();
-                    });
-                    entry.connections.clear();
-                }
-                entry.instance.Destroy();
+            for (let i = newHead; i <= newTail; i++) {
+                const child = newChildren[i]!;
+                const reused = remainingOld.get(child.key);
+                const entry = this.syncChildEntry(parentInstance, reused, child);
+                capture(i, child.key, entry);
+                remainingOld.delete(child.key);
+            }
+
+            remainingOld.forEach((entry, key) => {
+                this.cleanupChildEntry(entry);
+                region.entries.delete(key);
+            });
+        }
+
+        if (newEntries.size() === 0 && region.entries.size() === 0) {
+            region.orderedKeys = [];
+            return;
+        }
+
+        region.entries.forEach((entry, key) => {
+            if (!newEntries.has(key)) {
+                this.cleanupChildEntry(entry);
             }
         });
 
         region.entries = newEntries;
-        region.orderedKeys = newChildren.map((child) => child.key);
+        region.orderedKeys = nextOrder.filter((key): key is string => key !== undefined);
+
+        for (let i = 0; i < region.orderedKeys.size(); i++) {
+            const key = region.orderedKeys[i];
+            const entry = newEntries.get(key);
+            if (entry === undefined) {
+                continue;
+            }
+
+            const instance = entry.block?.l ?? entry.instance;
+            if (instance !== undefined) {
+                this.moveInstanceToParent(instance, parentInstance);
+                this.setLayoutOrder(instance, region.startIndex + i);
+            }
+        }
     }
 
     private mountBlockChild(block: Block, parent: Instance): Instance {
@@ -1091,6 +1355,151 @@ export function useFinePatchBlock<T extends unknown[]>(
     return clonedElement;
 }
 
+interface VirtualListRange {
+    start: number;
+    end: number;
+}
+
+interface VirtualListOptions<T> {
+    items: ReadonlyArray<T> | T[];
+    itemHeight: number;
+    overscan?: number;
+}
+
+export interface VirtualListItem<T> {
+    item: T;
+    index: number;
+}
+
+export interface VirtualListResult<T> {
+    visibleItems: VirtualListItem<T>[];
+    range: VirtualListRange;
+    totalHeight: number;
+    beforeSpacerHeight: number;
+    afterSpacerHeight: number;
+    containerProps: {
+        ref: (instance: Instance | undefined) => void;
+        CanvasSize: UDim2;
+    };
+}
+
+export function useVirtualList<T>(options: VirtualListOptions<T>): VirtualListResult<T> {
+    const { items, itemHeight, overscan = 2 } = options;
+
+    const itemsArray = items as T[];
+    const itemsCount = itemsArray.size();
+
+    const [scrollFrame, setScrollFrame] = useState<ScrollingFrame | undefined>(undefined);
+    const [range, setRange] = useState<VirtualListRange>(() => ({
+        start: 0,
+        end: math.min(itemsCount, math.max(overscan * 2 + 1, 0)),
+    }));
+
+    const computeRange = (scrollTop: number, viewportHeight: number): VirtualListRange => {
+        if (itemHeight <= 0) {
+            return { start: 0, end: itemsCount };
+        }
+
+        const estimatedStart = math.floor(scrollTop / itemHeight) - overscan;
+        const estimatedEnd = math.ceil((scrollTop + viewportHeight) / itemHeight) + overscan;
+
+        const clampedStart = math.max(estimatedStart, 0);
+        const clampedEnd = math.max(math.min(estimatedEnd, itemsCount), clampedStart);
+
+        return { start: clampedStart, end: clampedEnd };
+    };
+
+    const updateRange = (frame: ScrollingFrame | undefined) => {
+        if (frame === undefined) {
+            return;
+        }
+
+        const viewportHeight = frame.AbsoluteWindowSize.Y;
+        const scrollTop = frame.CanvasPosition.Y;
+        const nextRange = computeRange(scrollTop, viewportHeight);
+
+        setRange((prev) => {
+            if (prev.start === nextRange.start && prev.end === nextRange.end) {
+                return prev;
+            }
+            return nextRange;
+        });
+    };
+
+    const handleRef = React.useCallback((instance: Instance | undefined) => {
+        if (instance !== undefined && instance.IsA("ScrollingFrame")) {
+            setScrollFrame(instance);
+            updateRange(instance);
+        } else {
+            setScrollFrame(undefined);
+        }
+    }, []);
+
+    useEffect(() => {
+        const frame = scrollFrame;
+        if (frame === undefined) {
+            return;
+        }
+
+        const onScroll = () => updateRange(frame);
+        onScroll();
+
+        const canvasConnection = frame.GetPropertyChangedSignal("CanvasPosition").Connect(onScroll);
+        const sizeConnection = frame.GetPropertyChangedSignal("AbsoluteWindowSize").Connect(onScroll);
+
+        return () => {
+            canvasConnection.Disconnect();
+            sizeConnection.Disconnect();
+        };
+    }, [scrollFrame, itemHeight, overscan, itemsCount]);
+
+    useEffect(() => {
+        if (scrollFrame !== undefined) {
+            updateRange(scrollFrame);
+        } else {
+            setRange({
+                start: 0,
+                end: math.min(itemsCount, math.max(overscan * 2 + 1, 0)),
+            });
+        }
+    }, [itemsCount, itemHeight, overscan, scrollFrame]);
+
+    const visibleItems = React.useMemo(() => {
+        const slice: VirtualListItem<T>[] = [];
+        const startIndex = range.start;
+        const endIndex = math.min(range.end, itemsCount);
+        for (let index = startIndex; index < endIndex; index++) {
+            const item = itemsArray[index];
+            if (item === undefined) {
+                continue;
+            }
+            slice.push({ item, index });
+        }
+        return slice;
+    }, [range.start, range.end, items, itemsCount]);
+
+    const totalHeight = itemsCount * itemHeight;
+    const clampedEnd = math.min(range.end, itemsCount);
+    const beforeSpacerHeight = range.start * itemHeight;
+    const afterSpacerHeight = math.max(totalHeight - clampedEnd * itemHeight, 0);
+
+    const containerProps = React.useMemo(() => {
+        return {
+            ref: handleRef,
+            CanvasSize: new UDim2(0, 0, 0, totalHeight),
+        };
+    }, [handleRef, totalHeight]);
+
+    return {
+        visibleItems,
+        range,
+        totalHeight,
+        beforeSpacerHeight,
+        afterSpacerHeight,
+        containerProps,
+    };
+}
+
 /**
  * Creates a memoized block that only re-renders when dependencies change
  */
@@ -1207,7 +1616,7 @@ export function createStaticElement(
         staticProps.children = staticChildren;
     }
 
-    return {
+    const staticElement = {
         // Built-in properties that belong on the element
         type: elementType,
         key: undefined,
@@ -1215,7 +1624,23 @@ export function createStaticElement(
         props: staticProps,
         // This tag allows React to uniquely identify this as a React Element
         $$typeof: REACT_ELEMENT_TYPE,
-    } as ReactElement;
+    } as StaticReactElement;
+
+    // Pre-build instance template for compile-time instance creation
+    ensureStaticInstanceFactory(staticElement);
+
+    return staticElement;
+}
+
+export function createStaticInstance(element: ReactElement, parent?: Instance): Instance {
+    const staticElement = element as StaticReactElement;
+    const factory = ensureStaticInstanceFactory(staticElement);
+    return factory(parent);
+}
+
+export function createStaticInstanceFactory(element: ReactElement): StaticInstanceFactory {
+    const staticElement = element as StaticReactElement;
+    return ensureStaticInstanceFactory(staticElement);
 }
 
 /**

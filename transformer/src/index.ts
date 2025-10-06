@@ -1,4 +1,4 @@
-import * as ts from "typescript";
+﻿import * as ts from "typescript";
 import { BlockAnalyzer } from "./analyzer";
 import { runtimeHelper } from "./runtime-helper";
 import {
@@ -322,6 +322,29 @@ function addStaticDeclarations(file: ts.SourceFile, context: OptimizationContext
         );
 
         moduleStatements.push(elementDeclaration);
+
+        if (info.instanceFactoryId) {
+            const factoryDeclaration = ts.factory.createVariableStatement(
+                undefined,
+                ts.factory.createVariableDeclarationList(
+                    [
+                        ts.factory.createVariableDeclaration(
+                            ts.factory.createIdentifier(info.instanceFactoryId),
+                            undefined,
+                            undefined,
+                            ts.factory.createCallExpression(
+                                ts.factory.createIdentifier("createStaticInstanceFactory"),
+                                undefined,
+                                [ts.factory.createIdentifier(id)],
+                            ),
+                        ),
+                    ],
+                    ts.NodeFlags.Const,
+                ),
+            );
+
+            moduleStatements.push(factoryDeclaration);
+        }
     }
 
     // Insert static declarations after imports but before other statements

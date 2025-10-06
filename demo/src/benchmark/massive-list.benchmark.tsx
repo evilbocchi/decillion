@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from "@rbxts/react";
+import React, { useState, useMemo } from "@rbxts/react";
+import { useVirtualList } from "@decillion/runtime";
 
 /**
  * Benchmark: Massive List Rendering
@@ -10,15 +11,17 @@ interface ListItemProps {
     name: string;
     value: number;
     isActive: boolean;
+    layoutOrder?: number;
 }
 
 // Traditional React approach (for comparison) - skipped by @undecillion
 // @undecillion
-function TraditionalListItem({ id, name, value, isActive }: ListItemProps) {
+function TraditionalListItem({ id, name, value, isActive, layoutOrder }: ListItemProps) {
     return (
         <frame
             Size={new UDim2(1, 0, 0, 40)}
             BackgroundColor3={isActive ? Color3.fromRGB(100, 150, 100) : Color3.fromRGB(80, 80, 80)}
+            LayoutOrder={layoutOrder}
         >
             <textlabel
                 Text={`${name}: ${value}`}
@@ -38,11 +41,12 @@ function TraditionalListItem({ id, name, value, isActive }: ListItemProps) {
 }
 
 // Optimized Decillion approach
-function OptimizedListItem({ id, name, value, isActive }: ListItemProps) {
+function OptimizedListItem({ id, name, value, isActive, layoutOrder }: ListItemProps) {
     return (
         <frame
             Size={new UDim2(1, 0, 0, 40)}
             BackgroundColor3={isActive ? Color3.fromRGB(100, 150, 100) : Color3.fromRGB(80, 80, 80)}
+            LayoutOrder={layoutOrder}
         >
             {/* Static structure should be completely optimized */}
             <textlabel
@@ -67,17 +71,21 @@ export default function MassiveListBenchmark() {
     const [useOptimized, setUseOptimized] = useState(true);
     const [updateTrigger, setUpdateTrigger] = useState(0);
     const [renderTime, setRenderTime] = useState(0);
+    const ITEM_HEIGHT = 45;
 
     // Generate test data
-    const items: ListItemProps[] = [];
-    for (let i = 0; i < itemCount; i++) {
-        items.push({
-            id: i,
-            name: `Item ${i}`,
-            value: math.random(1, 1000),
-            isActive: math.random() > 0.7,
-        });
-    }
+    const items = useMemo(() => {
+        const generated: ListItemProps[] = [];
+        for (let i = 0; i < itemCount; i++) {
+            generated.push({
+                id: i,
+                name: `Item ${i}`,
+                value: math.random(1, 1000),
+                isActive: math.random() > 0.7,
+            });
+        }
+        return generated;
+    }, [itemCount, updateTrigger]);
 
     const triggerUpdate = () => {
         const startTime = tick();
@@ -91,6 +99,10 @@ export default function MassiveListBenchmark() {
     };
 
     const ListComponent = useOptimized ? OptimizedListItem : TraditionalListItem;
+    const virtualList = useVirtualList<ListItemProps>({ items, itemHeight: ITEM_HEIGHT, overscan: 6 });
+
+    const baseLayoutOrder = virtualList.range.start * 2;
+    const visibleCount = virtualList.visibleItems.size();
 
     return (
         <frame Size={new UDim2(1, 0, 1, 0)} BackgroundColor3={Color3.fromRGB(20, 20, 20)}>
@@ -129,28 +141,54 @@ export default function MassiveListBenchmark() {
                     BackgroundTransparency={1}
                 />
 
-                <textlabel
+                <textbutton
                     Text={`Items: ${itemCount}`}
-                    Size={new UDim2(0.5, 0, 0, 30)}
+                    Size={new UDim2(0.3, 0, 0, 30)}
                     Position={new UDim2(0, 0, 0, 70)}
-                    TextColor3={Color3.fromRGB(200, 200, 200)}
-                    BackgroundTransparency={1}
+                    BackgroundColor3={Color3.fromRGB(80, 120, 180)}
+                    TextColor3={Color3.fromRGB(255, 255, 255)}
+                    Event={{
+                        MouseButton1Click: () =>
+                            setItemCount((current) => {
+                                const next = current >= 5000 ? 1000 : current + 1000;
+                                return next;
+                            }),
+                    }}
                 />
             </frame>
 
             {/* Scrollable List */}
             <scrollingframe
+                {...virtualList.containerProps}
                 Size={new UDim2(1, 0, 1, -100)}
                 Position={new UDim2(0, 0, 0, 100)}
                 BackgroundColor3={Color3.fromRGB(30, 30, 30)}
-                CanvasSize={new UDim2(0, 0, 0, itemCount * 45)}
                 ScrollBarThickness={10}
             >
                 <uilistlayout SortOrder={Enum.SortOrder.LayoutOrder} Padding={new UDim(0, 5)} />
 
-                {items.map((item: ListItemProps, index: number) => (
-                    <ListComponent key={`item-${item.id}-${updateTrigger}`} {...item} />
-                ))}
+                <frame
+                    LayoutOrder={baseLayoutOrder}
+                    Size={new UDim2(1, 0, 0, virtualList.beforeSpacerHeight)}
+                    BackgroundTransparency={1}
+                />
+
+                {virtualList.visibleItems.map((virtualItem: typeof virtualList.visibleItems[number], visibleIndex: number) => {
+                    const { item } = virtualItem;
+                    return (
+                        <ListComponent
+                            key={`item-${item.id}`}
+                            {...item}
+                            layoutOrder={baseLayoutOrder + visibleIndex * 2 + 1}
+                        />
+                    );
+                })}
+
+                <frame
+                    LayoutOrder={baseLayoutOrder + visibleCount * 2 + 1}
+                    Size={new UDim2(1, 0, 0, virtualList.afterSpacerHeight)}
+                    BackgroundTransparency={1}
+                />
             </scrollingframe>
         </frame>
     );

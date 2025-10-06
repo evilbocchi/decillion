@@ -1,4 +1,4 @@
-import * as ts from "typescript";
+﻿import * as ts from "typescript";
 
 /**
  * Manages runtime helper imports and utilities for optimized blocks
@@ -36,6 +36,11 @@ class RuntimeHelper {
                         false,
                         undefined,
                         ts.factory.createIdentifier("createStaticElement"),
+                    ),
+                    ts.factory.createImportSpecifier(
+                        false,
+                        undefined,
+                        ts.factory.createIdentifier("createStaticInstanceFactory"),
                     ),
                     ts.factory.createImportSpecifier(false, undefined, ts.factory.createIdentifier("createBlock")),
                     ts.factory.createImportSpecifier(false, undefined, ts.factory.createIdentifier("useMemoizedBlock")),

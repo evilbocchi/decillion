@@ -1,7 +1,7 @@
 import * as ts from "typescript";
 import { describe, expect, it } from "vitest";
 import { BlockAnalyzer } from "../src/analyzer";
-import { EditType } from "../src/types";
+import { EditType, type ChildEdit } from "../src/types";
 
 describe("Fine-grained patching", () => {
     function createProgram(code: string): {
@@ -168,5 +168,20 @@ function Component({ items }: { items: string[] }) {
             instruction.edits.some((edit) => edit.type === EditType.Child),
         );
         expect(hasChildEdits).toBe(true);
+
+        const childInstruction = patchInfo.patchInstructions.find((instruction) =>
+            instruction.edits.some((edit) => edit.type === EditType.Child),
+        );
+
+        expect(childInstruction).toBeTruthy();
+
+        const childEdit = childInstruction!.edits.find(
+            (edit) => edit.type === EditType.Child,
+        ) as ChildEdit | undefined;
+
+        expect(childInstruction!.elementPath).toEqual([0]);
+        expect(childEdit).toBeDefined();
+        expect(childEdit!.index).toBe(0);
+        expect(childEdit!.path).toEqual([0, 0]);
     });
 });

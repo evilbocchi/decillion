@@ -36,6 +36,7 @@ export interface StaticElementInfo {
     propsTableId: string;
     children: ts.Expression[];
     element: ts.CallExpression;
+    instanceFactoryId?: string;
 }
 
 export interface TransformResult {
@@ -43,6 +44,7 @@ export interface TransformResult {
     needsRuntimeImport: boolean;
     staticPropsTable?: { id: string; props: PropInfo[] };
     staticElement?: StaticElementInfo;
+    staticInstanceFactoryId?: string;
 }
 
 /**

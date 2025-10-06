@@ -6,6 +6,7 @@ import {
     createStaticElementCall,
     generateBlockId,
     generateStaticElementId,
+    generateStaticInstanceFactoryId,
     generateStaticPropsId,
     createDependenciesArray,
 } from "./codegen";
@@ -367,12 +368,14 @@ function generateStaticElement(
     // Check if we should extract the full static element to module level
     if (extractFullElement && isCompletelyStatic(node, context)) {
         const elementId = generateStaticElementId(tagName);
+        const instanceFactoryId = generateStaticInstanceFactoryId(tagName);
         const staticElementInfo: StaticElementInfo = {
             id: elementId,
             tagName,
             propsTableId: staticPropsTable?.id || "",
             children,
             element: elementCall,
+            instanceFactoryId,
         };
 
         context.staticElements.set(elementId, staticElementInfo);
@@ -383,6 +386,7 @@ function generateStaticElement(
             needsRuntimeImport: true,
             staticPropsTable,
             staticElement: staticElementInfo,
+            staticInstanceFactoryId: instanceFactoryId,
         };
     }
 
