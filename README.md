@@ -13,6 +13,48 @@ Decillion is a TypeScript-to-Luau compiler plugin and runtime that brings Millio
 - **Roact-like API**: Familiar, ergonomic API for Roblox-TS developers.
 - **Compile-Time Optimizations**: Most work is done at compile time, not runtime.
 
+## Installation
+```sh
+npm i @decillion/runtime rbxts-transformer-decillion
+```
+
+Add to typeRoots in `tsconfig.json`:
+```json
+{
+  "compilerOptions": {
+    "typeRoots": ["node_modules/@decillion", "node_modules/@types"]
+  }
+}
+```
+
+Add to node_modules in `default.project.json`:
+```json
+{
+  "node_modules": {
+    "$className": "Folder",
+    "@rbxts": {
+        "$path": "node_modules/@rbxts"
+    },
+    "@decillion": {
+        "$path": "node_modules/@decillion"
+    }
+  }
+}
+```
+
+Add to `plugins` in `tsconfig.json`:
+```json
+{
+  "compilerOptions": {
+    "plugins": [
+      {
+        "transform": "rbxts-transformer-decillion",
+      }
+    ]
+  }
+}
+```
+
 ## Example
 
 ```tsx
