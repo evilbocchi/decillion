@@ -38,5 +38,9 @@
     "repository": {
         "type": "git",
         "url": "https://github.com/evilbocchi/decillion.git"
-    }
+    },
+    "workspaces": [
+        "runtime",
+        "transformer"
+    ]
 }
