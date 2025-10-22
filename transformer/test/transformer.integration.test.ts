@@ -1,6 +1,6 @@
 import * as ts from "typescript";
 import { describe, expect, it } from "vitest";
-import decillionTransformer from "../src/index";
+import decillionTransformer, { type DecillionTransformerOptions } from "../src/index";
 
 function createProgramWithSource(code: string) {
     const sourceFile = ts.createSourceFile("test.tsx", code, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
@@ -30,9 +30,13 @@ function createProgramWithSource(code: string) {
     return { program, sourceFile };
 }
 
-function transformSource(code: string): string {
+function transformSource(code: string, options?: DecillionTransformerOptions): string {
     const { program, sourceFile } = createProgramWithSource(code);
-    const transformer = decillionTransformer(program, { addSignature: false, debug: false });
+    const transformer = decillionTransformer(program, {
+        addSignature: false,
+        debug: false,
+        ...(options ?? {}),
+    });
     const transformerFactory = transformer as ts.TransformerFactory<ts.SourceFile>;
     const { transformed } = ts.transform(sourceFile, [transformerFactory]);
     const transformedFile = transformed[0] as ts.SourceFile;
@@ -171,6 +175,46 @@ export function WithRef() {
         expect(output).not.toContain("createStaticElement(\"Frame\"");
         expect(output).toContain("React.createElement");
         expect(output).toContain("ref: frameRef");
+    });
+
+    it("disables advanced optimizations for configured hooks like useContext", () => {
+        const source = `
+import React, { useContext } from "@rbxts/react";
+
+const ThemeContext = {} as never;
+
+export function WithContext() {
+    const theme = useContext(ThemeContext);
+    return <textlabel Text={theme as unknown as string} />;
+}
+`;
+
+        const output = transformSource(source, {
+            disabledOptimizations: { hooks: ["useContext"] },
+        });
+
+        expect(output).toContain("React.createElement");
+        expect(output).not.toContain("createStaticElement");
+        expect(output).not.toContain("useFinePatchBlock");
+    });
+
+    it("supports disabling optimizations for multiple configured hooks", () => {
+        const source = `
+import React, { useRef } from "@rbxts/react";
+
+export function WithRefValue() {
+    const value = useRef(0);
+    return <textlabel Text={value.current as unknown as string} />;
+}
+`;
+
+        const output = transformSource(source, {
+            disabledOptimizations: { hooks: ["useRef"] },
+        });
+
+        expect(output).toContain("React.createElement");
+        expect(output).not.toContain("createStaticElement");
+        expect(output).not.toContain("useFinePatchBlock");
     });
 
     it("emits event patch instructions for event handlers", () => {

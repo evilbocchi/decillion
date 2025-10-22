@@ -11,7 +11,16 @@ import {
     createDependenciesArray,
 } from "./codegen";
 import { robloxStaticDetector } from "./roblox-bridge";
-import type { OptimizationContext, PropInfo, StaticElementInfo, TransformResult, PatchInstruction } from "./types";
+import type {
+    DisabledOptimizationOptions,
+    OptimizationContext,
+    PropInfo,
+    ResolvedDisabledOptimizationOptions,
+    StaticElementInfo,
+    TransformResult,
+    PatchInstruction,
+} from "./types";
+import { isResolvedDisabledOptimizations, resolveDisabledOptimizations } from "./types";
 
 /**
  * Creates the appropriate tag reference for React.createElement
@@ -285,7 +294,12 @@ export class DecillionTransformer {
         typeChecker: ts.TypeChecker,
         transformationContext: ts.TransformationContext,
         blockAnalyzer?: BlockAnalyzer,
+        disabledOptimizations?: DisabledOptimizationOptions | ResolvedDisabledOptimizationOptions,
     ) {
+        const resolvedDisabledOptimizations = isResolvedDisabledOptimizations(disabledOptimizations)
+            ? disabledOptimizations
+            : resolveDisabledOptimizations(disabledOptimizations);
+
         this.context = {
             typeChecker,
             context: transformationContext,
@@ -297,8 +311,10 @@ export class DecillionTransformer {
             blockAnalyzer,
             skipTransformFunctions: new Set<string>(),
             functionContextStack: [],
+            forceBasicTransformFunctions: new Set<string>(),
             tagToInstanceNameMap: robloxStaticDetector.getTagToInstanceNameMap(),
             requiredTypeImports: new Set<string>(),
+            disabledOptimizations: resolvedDisabledOptimizations,
         };
     }
 
@@ -329,10 +345,13 @@ export function transformJsxElementWithFinePatch(
     node: ts.JsxElement | ts.JsxSelfClosingElement,
     context: OptimizationContext,
 ): TransformResult {
-    const transformer = new DecillionTransformer(context.typeChecker, context.context, context.blockAnalyzer);
-
-    const blockInfo = transformer.analyzeJsxElement(node);
     const tagName = context.blockAnalyzer!.getJsxTagName(node);
+
+    if (shouldUseBasicTransform(context)) {
+        return generateOptimizedElement(node, tagName, context);
+    }
+
+    const blockInfo = context.blockAnalyzer!.analyzeJsxElement(node);
 
     if (blockInfo.hasNonOptimizableProps) {
         return generateOptimizedElement(node, tagName, context);
@@ -510,10 +529,13 @@ export function transformJsxElement(
     node: ts.JsxElement | ts.JsxSelfClosingElement,
     context: OptimizationContext,
 ): TransformResult {
-    const transformer = new DecillionTransformer(context.typeChecker, context.context, context.blockAnalyzer);
-
-    const blockInfo = transformer.analyzeJsxElement(node);
     const tagName = context.blockAnalyzer!.getJsxTagName(node);
+
+    if (shouldUseBasicTransform(context)) {
+        return generateOptimizedElement(node, tagName, context);
+    }
+
+    const blockInfo = context.blockAnalyzer!.analyzeJsxElement(node);
 
     if (blockInfo.isStatic) {
         return generateStaticElement(node, tagName, context);
@@ -1054,4 +1076,10 @@ export function getFunctionName(
  */
 export function shouldSkipTransformation(context: OptimizationContext): boolean {
     return context.functionContextStack.some((functionName) => context.skipTransformFunctions.has(functionName));
+}
+
+export function shouldUseBasicTransform(context: OptimizationContext): boolean {
+    return context.functionContextStack.some((functionName) =>
+        context.forceBasicTransformFunctions.has(functionName),
+    );
 }

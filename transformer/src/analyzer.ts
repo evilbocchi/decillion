@@ -23,17 +23,21 @@ export interface BlockInfo {
 export class BlockAnalyzer {
     private blockCounter = 0;
     private blocks = new Map<ts.Node, BlockInfo>();
+    private readonly bailoutPropNames: Set<string>;
 
     constructor(
         private typeChecker: ts.TypeChecker,
         private context: ts.TransformationContext,
         private program?: ts.Program,
         private debug = false,
+        customBailoutProps: Set<string> = new Set(),
     ) {
         // Initialize the Roblox static detector
         if (program) {
             robloxStaticDetector.initialize(program, debug);
         }
+
+        this.bailoutPropNames = new Set([...BAILOUT_PROP_NAMES, ...customBailoutProps]);
     }
 
     /**
@@ -73,7 +77,7 @@ export class BlockAnalyzer {
                 if (!attr.initializer) {
                     const propName = ts.isIdentifier(attr.name) ? attr.name.text : attr.name.getText();
                     const normalized = propName.toLowerCase();
-                    if (BAILOUT_PROP_NAMES.has(normalized)) {
+                    if (this.bailoutPropNames.has(normalized)) {
                         blockInfo.hasNonOptimizableProps = true;
                         blockInfo.isStatic = false;
                         continue;
@@ -86,7 +90,7 @@ export class BlockAnalyzer {
                 const propName = ts.isIdentifier(attr.name) ? attr.name.text : attr.name.getText();
                 const normalized = propName.toLowerCase();
 
-                if (BAILOUT_PROP_NAMES.has(normalized)) {
+                if (this.bailoutPropNames.has(normalized)) {
                     blockInfo.hasNonOptimizableProps = true;
                     blockInfo.isStatic = false;
 
