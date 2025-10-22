@@ -1,6 +1,54 @@
 import * as ts from "typescript";
 import type { BlockAnalyzer } from "./analyzer";
 
+export interface DisabledOptimizationOptions {
+    hooks?: string[];
+    props?: string[];
+}
+
+export interface ResolvedDisabledOptimizationOptions {
+    hooks: Set<string>;
+    props: Set<string>;
+}
+
+export function resolveDisabledOptimizations(
+    options: DisabledOptimizationOptions | undefined,
+): ResolvedDisabledOptimizationOptions {
+    const hooks = new Set<string>();
+    const props = new Set<string>();
+
+    if (options?.hooks) {
+        for (const hook of options.hooks) {
+            const trimmed = hook.trim();
+            if (trimmed) {
+                hooks.add(trimmed);
+            }
+        }
+    }
+
+    if (options?.props) {
+        for (const prop of options.props) {
+            const normalized = prop.trim().toLowerCase();
+            if (normalized) {
+                props.add(normalized);
+            }
+        }
+    }
+
+    return { hooks, props };
+}
+
+export function isResolvedDisabledOptimizations(
+    value: DisabledOptimizationOptions | ResolvedDisabledOptimizationOptions | undefined,
+): value is ResolvedDisabledOptimizationOptions {
+    return (
+        value !== undefined &&
+        value !== null &&
+        value.hooks instanceof Set &&
+        value.props instanceof Set
+    );
+}
+
 /**
  * Core types for block analysis and transformation
  */
@@ -95,8 +143,12 @@ export interface OptimizationContext {
     skipTransformFunctions: Set<string>;
     /** Stack of current function context to track if we're inside a skip function */
     functionContextStack: string[];
+    /** Set of functions that should use the basic transformation pipeline due to disabled features */
+    forceBasicTransformFunctions: Set<string>;
     /** Map of tag names to Roblox instance names */
     tagToInstanceNameMap: Map<string, string>;
     /** Type-only imports required from the runtime */
     requiredTypeImports: Set<string>;
+    /** Resolved disabled optimization configuration */
+    disabledOptimizations: ResolvedDisabledOptimizationOptions;
 }

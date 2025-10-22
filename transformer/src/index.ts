@@ -8,7 +8,8 @@ import {
     shouldSkipTransformation,
     transformJsxElementWithFinePatch,
 } from "./transformer";
-import type { OptimizationContext, PropInfo, StaticElementInfo } from "./types";
+import type { DisabledOptimizationOptions, OptimizationContext, PropInfo, StaticElementInfo } from "./types";
+import { resolveDisabledOptimizations } from "./types";
 
 /**
  * Configuration options for the Decillion transformer
@@ -20,6 +21,8 @@ export interface DecillionTransformerOptions {
     signatureMessage?: string;
     /** Enable debug logging */
     debug?: boolean;
+    /** Configuration for disabling specific optimization features */
+    disabledOptimizations?: DisabledOptimizationOptions;
 }
 
 /**
@@ -27,7 +30,8 @@ export interface DecillionTransformerOptions {
  * Transforms JSX into highly optimized, block-memoized UI code
  */
 export default function (program: ts.Program, options: DecillionTransformerOptions = {}) {
-    const { addSignature = true, signatureMessage, debug = false } = options;
+    const { addSignature = true, signatureMessage, debug = false, disabledOptimizations } = options;
+    const resolvedDisabledOptimizations = resolveDisabledOptimizations(disabledOptimizations);
 
     return (context: ts.TransformationContext): ((file: ts.SourceFile) => ts.Node) => {
         return (file: ts.SourceFile) => {
@@ -46,22 +50,40 @@ export default function (program: ts.Program, options: DecillionTransformerOptio
             }
 
             // Initialize transformation context with the new architecture
-            const blockAnalyzer = new BlockAnalyzer(program.getTypeChecker(), context, program, debug);
-            const transformer = new DecillionTransformer(program.getTypeChecker(), context, blockAnalyzer);
+            const blockAnalyzer = new BlockAnalyzer(
+                program.getTypeChecker(),
+                context,
+                program,
+                debug,
+                resolvedDisabledOptimizations.props,
+            );
+            const transformer = new DecillionTransformer(
+                program.getTypeChecker(),
+                context,
+                blockAnalyzer,
+                resolvedDisabledOptimizations,
+            );
             const optimizationContext = transformer.getContext();
 
             let needsRuntimeImport = false;
 
             // First pass: scan for functions with @undecillion decorator
+            const functionStack: (string | undefined)[] = [];
+
             const scanVisitor = (node: ts.Node): void => {
+                let pushed = false;
+
                 if (
                     ts.isFunctionDeclaration(node) ||
                     ts.isFunctionExpression(node) ||
                     ts.isArrowFunction(node) ||
                     ts.isMethodDeclaration(node)
                 ) {
+                    const functionName = getFunctionName(node);
+                    functionStack.push(functionName);
+                    pushed = true;
+
                     if (hasUndecillionDecorator(node, file)) {
-                        const functionName = getFunctionName(node);
                         if (functionName) {
                             optimizationContext.skipTransformFunctions.add(functionName);
                             if (debug) {
@@ -71,7 +93,26 @@ export default function (program: ts.Program, options: DecillionTransformerOptio
                     }
                 }
 
+                if (ts.isCallExpression(node) && resolvedDisabledOptimizations.hooks.size > 0) {
+                    const hookName = getCallExpressionIdentifier(node);
+                    if (hookName && resolvedDisabledOptimizations.hooks.has(hookName)) {
+                        const activeFunction = getActiveFunctionName(functionStack);
+                        if (activeFunction) {
+                            optimizationContext.forceBasicTransformFunctions.add(activeFunction);
+                            if (debug) {
+                                console.log(
+                                    `Disabling advanced optimizations for ${activeFunction} due to hook ${hookName}`,
+                                );
+                            }
+                        }
+                    }
+                }
+
                 ts.forEachChild(node, scanVisitor);
+
+                if (pushed) {
+                    functionStack.pop();
+                }
             };
 
             // Scan the file first
@@ -121,8 +162,11 @@ export default function (program: ts.Program, options: DecillionTransformerOptio
                         console.log(`Found JSX element: ${getTagName(node)}`);
                     }
 
-                    needsRuntimeImport = true;
                     const result = transformJsxElementWithFinePatch(node, optimizationContext);
+
+                    if (result.needsRuntimeImport) {
+                        needsRuntimeImport = true;
+                    }
 
                     // Store any static elements that were generated
                     if (result.staticElement) {
@@ -210,6 +254,31 @@ function getTagName(node: ts.JsxElement | ts.JsxSelfClosingElement): string {
     }
 
     return "UnknownTag";
+}
+
+function getCallExpressionIdentifier(callExpression: ts.CallExpression): string | undefined {
+    const expression = callExpression.expression;
+
+    if (ts.isIdentifier(expression)) {
+        return expression.text;
+    }
+
+    if (ts.isPropertyAccessExpression(expression) && ts.isIdentifier(expression.name)) {
+        return expression.name.text;
+    }
+
+    return undefined;
+}
+
+function getActiveFunctionName(stack: (string | undefined)[]): string | undefined {
+    for (let index = stack.length - 1; index >= 0; index--) {
+        const name = stack[index];
+        if (name) {
+            return name;
+        }
+    }
+
+    return undefined;
 }
 
 /**
