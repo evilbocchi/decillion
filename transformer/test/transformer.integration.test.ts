@@ -228,4 +228,26 @@ export function UsesState() {
         const reactIndex = output.indexOf("@rbxts/react");
         expect(runtimeIndex).toBeLessThan(reactIndex);
     });
+
+    it("handles Context.Provider components correctly", () => {
+        const source = `
+import React, { createContext, useContext } from "@rbxts/react";
+
+const layerContext = createContext(0);
+
+export default () => {
+    const depth = useContext(layerContext);
+
+    return <layerContext.Provider value={depth + 1}></layerContext.Provider>;
+};
+`;
+        const output = transformSource(source);
+
+        // Should not contain UnknownTag
+        expect(output).not.toContain("UnknownTag");
+
+        // Should generate React.createElement with layerContext.Provider
+        expect(output).toContain("React.createElement");
+        expect(output).toContain("layerContext.Provider");
+    });
 });

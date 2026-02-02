@@ -209,6 +209,20 @@ function getTagName(node: ts.JsxElement | ts.JsxSelfClosingElement): string {
         return tagName.text;
     }
 
+    // Handle PropertyAccessExpression (e.g., Ctx.Provider, React.Fragment)
+    if (ts.isPropertyAccessExpression(tagName)) {
+        // Return a string representation for logging
+        const getText = (expr: ts.Expression): string => {
+            if (ts.isIdentifier(expr)) {
+                return expr.text;
+            } else if (ts.isPropertyAccessExpression(expr)) {
+                return getText(expr.expression) + "." + expr.name.text;
+            }
+            return "Unknown";
+        };
+        return getText(tagName.expression) + "." + tagName.name.text;
+    }
+
     return "UnknownTag";
 }
 

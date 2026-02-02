@@ -62,8 +62,12 @@ export class BlockAnalyzer {
         // because they can have internal state, effects, hooks, etc.
         if (tagName[0] && tagName[0] === tagName[0].toUpperCase()) {
             blockInfo.isStatic = false;
-            // Add the component itself as a dependency if it's an identifier
-            blockInfo.dependencies.push(tagName);
+            // Add the component itself as a dependency
+            // For PropertyAccessExpression like Ctx.Provider, we only need the base identifier (Ctx)
+            const baseDependency = tagName.split(".")[0];
+            if (baseDependency) {
+                blockInfo.dependencies.push(baseDependency);
+            }
         }
 
         // Analyze attributes/props
@@ -490,6 +494,20 @@ export class BlockAnalyzer {
 
         if (ts.isIdentifier(tagName)) {
             return tagName.text;
+        }
+
+        // Handle PropertyAccessExpression (e.g., Ctx.Provider, React.Fragment)
+        if (ts.isPropertyAccessExpression(tagName)) {
+            // Return a string representation for ID generation
+            const getText = (expr: ts.Expression): string => {
+                if (ts.isIdentifier(expr)) {
+                    return expr.text;
+                } else if (ts.isPropertyAccessExpression(expr)) {
+                    return getText(expr.expression) + "." + expr.name.text;
+                }
+                return "Unknown";
+            };
+            return getText(tagName.expression) + "." + tagName.name.text;
         }
 
         return "UnknownTag";
