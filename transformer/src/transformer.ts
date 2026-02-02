@@ -17,16 +17,37 @@ import type { OptimizationContext, PropInfo, StaticElementInfo, TransformResult,
  * Creates the appropriate tag reference for React.createElement
  * - Lowercase tags (frame, textlabel) become string literals
  * - PascalCase tags (Counter, MyComponent) become identifiers
+ * - Property access (Ctx.Provider) preserves the expression
+ * - Namespaced names (ns:tag) are converted to string literals
  */
-function createTagReference(tagName: string): ts.Expression {
-    // Check if tag name starts with uppercase (PascalCase component)
-    if (tagName[0] && tagName[0] === tagName[0].toUpperCase()) {
-        // React component - use identifier
-        return ts.factory.createIdentifier(tagName);
-    } else {
-        // HTML-like element - use string literal
-        return ts.factory.createStringLiteral(tagName);
+function createTagReference(tagName: string | ts.JsxTagNameExpression): ts.Expression {
+    // If it's a string, convert it to the appropriate form
+    if (typeof tagName === "string") {
+        // Check if tag name starts with uppercase (PascalCase component)
+        if (tagName[0] && tagName[0] === tagName[0].toUpperCase()) {
+            // React component - use identifier
+            return ts.factory.createIdentifier(tagName);
+        } else {
+            // HTML-like element - use string literal
+            return ts.factory.createStringLiteral(tagName);
+        }
     }
+
+    // Handle JsxNamespacedName (e.g., <ns:tag>) - convert to string literal
+    if (ts.isJsxNamespacedName(tagName)) {
+        return ts.factory.createStringLiteral(`${tagName.namespace.text}:${tagName.name.text}`);
+    }
+
+    // For Identifier, PropertyAccessExpression, or ThisExpression, use them as-is
+    // These are all valid Expression types that can be used in React.createElement
+    return tagName as ts.Expression;
+}
+
+/**
+ * Extracts the tag name expression from a JSX element
+ */
+function getTagExpression(node: ts.JsxElement | ts.JsxSelfClosingElement): ts.JsxTagNameExpression {
+    return ts.isJsxElement(node) ? node.openingElement.tagName : node.tagName;
 }
 
 function sanitizeDependencyType(
@@ -366,6 +387,9 @@ function generateFinePatchBlock(
     // Generate patch instructions
     const finePatchInfo = context.blockAnalyzer!.generatePatchInstructions(node);
 
+    // Get the actual tag expression (handles PropertyAccessExpression like Ctx.Provider)
+    const tagExpression = getTagExpression(node);
+
     // Create the React.createElement call inside the arrow function
     const createElementCall = ts.factory.createCallExpression(
         ts.factory.createPropertyAccessExpression(
@@ -374,7 +398,7 @@ function generateFinePatchBlock(
         ),
         undefined,
         [
-            createTagReference(tagName),
+            createTagReference(tagExpression),
             allProps.length > 0 ? createPropsObject(allProps) : ts.factory.createIdentifier("undefined"),
             ...children,
         ],
@@ -626,6 +650,9 @@ function generateMemoizedBlock(
     const allProps = extractPropsFromJsx(node);
     const children = extractOptimizedChildren(node, context);
 
+    // Get the actual tag expression (handles PropertyAccessExpression like Ctx.Provider)
+    const tagExpression = getTagExpression(node);
+
     // Create the React.createElement call inside the arrow function
     const createElementCall = ts.factory.createCallExpression(
         ts.factory.createPropertyAccessExpression(
@@ -634,7 +661,7 @@ function generateMemoizedBlock(
         ),
         undefined,
         [
-            createTagReference(tagName),
+            createTagReference(tagExpression),
             allProps.length > 0 ? createPropsObject(allProps) : ts.factory.createIdentifier("undefined"),
             ...children,
         ],
@@ -754,13 +781,16 @@ function generateOptimizedElement(
 
     const propsArg = allProps.length > 0 ? createPropsObject(allProps) : ts.factory.createIdentifier("undefined");
 
+    // Get the actual tag expression (handles PropertyAccessExpression like Ctx.Provider)
+    const tagExpression = getTagExpression(node);
+
     const element = ts.factory.createCallExpression(
         ts.factory.createPropertyAccessExpression(
             ts.factory.createIdentifier("React"),
             ts.factory.createIdentifier("createElement"),
         ),
         undefined,
-        [createTagReference(tagName), propsArg, ...children],
+        [createTagReference(tagExpression), propsArg, ...children],
     );
 
     return {

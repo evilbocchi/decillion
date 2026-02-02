@@ -228,4 +228,79 @@ export function UsesState() {
         const reactIndex = output.indexOf("@rbxts/react");
         expect(runtimeIndex).toBeLessThan(reactIndex);
     });
+
+    it("handles Context.Provider components correctly", () => {
+        const source = `
+import React, { createContext, useContext } from "@rbxts/react";
+
+const layerContext = createContext(0);
+
+export default () => {
+    const depth = useContext(layerContext);
+
+    return <layerContext.Provider value={depth + 1}></layerContext.Provider>;
+};
+`;
+        const output = transformSource(source);
+
+        // Should not contain UnknownTag
+        expect(output).not.toContain("UnknownTag");
+
+        // Should generate React.createElement with layerContext.Provider
+        expect(output).toContain("React.createElement");
+        expect(output).toContain("layerContext.Provider");
+    });
+
+    it("handles React.Fragment correctly", () => {
+        const source = `
+import React from "@rbxts/react";
+
+export function FragmentExample({ items }: { items: string[] }) {
+    return (
+        <React.Fragment>
+            {items.map((item) => (
+                <textlabel key={item} Text={item} />
+            ))}
+        </React.Fragment>
+    );
+}
+`;
+        const output = transformSource(source);
+
+        // Should not contain UnknownTag
+        expect(output).not.toContain("UnknownTag");
+
+        // Should generate React.createElement with React.Fragment
+        expect(output).toContain("React.createElement");
+        expect(output).toContain("React.Fragment");
+    });
+
+    it("does not treat Provider with dynamic props as static", () => {
+        const source = `
+import React, { createContext } from "@rbxts/react";
+
+const ThemeContext = createContext("light");
+
+export function ThemeProvider({ theme, children }: { theme: string; children: React.ReactNode }) {
+    return <ThemeContext.Provider value={theme}>{children}</ThemeContext.Provider>;
+}
+`;
+        const output = transformSource(source);
+
+        // Should not contain UnknownTag
+        expect(output).not.toContain("UnknownTag");
+
+        // Should generate React.createElement with ThemeContext.Provider
+        expect(output).toContain("React.createElement");
+        expect(output).toContain("ThemeContext.Provider");
+
+        // Should NOT call createStaticElement with the Provider tag
+        // (it may appear in imports, but should not be called for this component)
+        expect(output).not.toMatch(/createStaticElement\([^)]*ThemeContext\.Provider/);
+        
+        // Should use useFinePatchBlock or regular createElement for dynamic props
+        const hasFinePatch = output.includes("useFinePatchBlock");
+        const hasCreateElement = output.includes("React.createElement(ThemeContext.Provider");
+        expect(hasFinePatch || hasCreateElement).toBe(true);
+    });
 });

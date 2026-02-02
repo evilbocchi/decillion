@@ -9,6 +9,7 @@ import {
     transformJsxElementWithFinePatch,
 } from "./transformer";
 import type { OptimizationContext, PropInfo, StaticElementInfo } from "./types";
+import { jsxTagExpressionToString } from "./utils";
 
 /**
  * Configuration options for the Decillion transformer
@@ -205,11 +206,11 @@ function shouldSkipFile(file: ts.SourceFile, debug: boolean): boolean {
 function getTagName(node: ts.JsxElement | ts.JsxSelfClosingElement): string {
     const tagName = ts.isJsxElement(node) ? node.openingElement.tagName : node.tagName;
 
-    if (ts.isIdentifier(tagName)) {
-        return tagName.text;
-    }
-
-    return "UnknownTag";
+    // Use the utility function to convert tag expression to string
+    const tagString = jsxTagExpressionToString(tagName);
+    
+    // Return UnknownTag only if the utility function couldn't identify the tag
+    return tagString !== "Unknown" ? tagString : "UnknownTag";
 }
 
 /**
