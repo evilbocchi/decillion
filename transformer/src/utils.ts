@@ -13,8 +13,26 @@ export function jsxTagExpressionToString(expr: ts.JsxTagNameExpression): string 
     if (ts.isIdentifier(expr)) {
         return expr.text;
     } else if (ts.isPropertyAccessExpression(expr)) {
-        const base = jsxTagExpressionToString(expr.expression as ts.JsxTagNameExpression);
-        return base + "." + expr.name.text;
+        // For PropertyAccessExpression, recursively process the base expression
+        // In JSX context, expr.expression should be another valid JSX tag name expression
+        // (Identifier, PropertyAccessExpression, or ThisExpression)
+        const baseExpr = expr.expression;
+        let baseString: string;
+        
+        if (ts.isIdentifier(baseExpr)) {
+            baseString = baseExpr.text;
+        } else if (ts.isPropertyAccessExpression(baseExpr)) {
+            // Recursively handle nested property access (e.g., a.b.c)
+            // Type assertion is safe here because we know it's a PropertyAccessExpression
+            baseString = jsxTagExpressionToString(baseExpr as ts.JsxTagNameExpression);
+        } else if ((baseExpr as ts.Node).kind === ts.SyntaxKind.ThisKeyword) {
+            baseString = "this";
+        } else {
+            // Fallback for unexpected expression types
+            baseString = "Unknown";
+        }
+        
+        return baseString + "." + expr.name.text;
     } else if ((expr as ts.Node).kind === ts.SyntaxKind.ThisKeyword) {
         // Handle ThisExpression
         return "this";

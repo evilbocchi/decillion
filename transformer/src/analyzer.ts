@@ -65,8 +65,8 @@ export class BlockAnalyzer {
             blockInfo.isStatic = false;
             // Add the component itself as a dependency
             // For PropertyAccessExpression like Ctx.Provider, we only need the base identifier (Ctx)
-            // Skip if tagName is UnknownTag or other invalid values
-            if (tagName !== "UnknownTag" && tagName !== "Unknown") {
+            // Skip if tagName is UnknownTag
+            if (tagName !== "UnknownTag") {
                 const baseDependency = tagName.split(".")[0];
                 if (baseDependency) {
                     blockInfo.dependencies.push(baseDependency);
