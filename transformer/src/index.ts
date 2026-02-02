@@ -206,17 +206,11 @@ function shouldSkipFile(file: ts.SourceFile, debug: boolean): boolean {
 function getTagName(node: ts.JsxElement | ts.JsxSelfClosingElement): string {
     const tagName = ts.isJsxElement(node) ? node.openingElement.tagName : node.tagName;
 
-    if (ts.isIdentifier(tagName)) {
-        return tagName.text;
-    }
-
-    // Handle PropertyAccessExpression (e.g., Ctx.Provider, React.Fragment)
-    if (ts.isPropertyAccessExpression(tagName)) {
-        // Return a string representation for logging
-        return jsxTagExpressionToString(tagName.expression) + "." + tagName.name.text;
-    }
-
-    return "UnknownTag";
+    // Use the utility function to convert tag expression to string
+    const tagString = jsxTagExpressionToString(tagName);
+    
+    // Return UnknownTag only if the utility function couldn't identify the tag
+    return tagString !== "Unknown" ? tagString : "UnknownTag";
 }
 
 /**

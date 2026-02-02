@@ -65,9 +65,12 @@ export class BlockAnalyzer {
             blockInfo.isStatic = false;
             // Add the component itself as a dependency
             // For PropertyAccessExpression like Ctx.Provider, we only need the base identifier (Ctx)
-            const baseDependency = tagName.split(".")[0];
-            if (baseDependency) {
-                blockInfo.dependencies.push(baseDependency);
+            // Skip if tagName is UnknownTag or other invalid values
+            if (tagName !== "UnknownTag" && tagName !== "Unknown") {
+                const baseDependency = tagName.split(".")[0];
+                if (baseDependency) {
+                    blockInfo.dependencies.push(baseDependency);
+                }
             }
         }
 
@@ -493,17 +496,11 @@ export class BlockAnalyzer {
     getJsxTagName(node: ts.JsxElement | ts.JsxSelfClosingElement): string {
         const tagName = ts.isJsxElement(node) ? node.openingElement.tagName : node.tagName;
 
-        if (ts.isIdentifier(tagName)) {
-            return tagName.text;
-        }
-
-        // Handle PropertyAccessExpression (e.g., Ctx.Provider, React.Fragment)
-        if (ts.isPropertyAccessExpression(tagName)) {
-            // Return a string representation for ID generation
-            return jsxTagExpressionToString(tagName.expression) + "." + tagName.name.text;
-        }
-
-        return "UnknownTag";
+        // Use the utility function to convert tag expression to string
+        const tagString = jsxTagExpressionToString(tagName);
+        
+        // Return UnknownTag only if the utility function couldn't identify the tag
+        return tagString !== "Unknown" ? tagString : "UnknownTag";
     }
 
     /**
