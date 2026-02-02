@@ -2,6 +2,7 @@ import * as ts from "typescript";
 import { robloxStaticDetector } from "./roblox-bridge";
 import type { DependencyInfo, PropEdit, ChildEdit, PatchInstruction, FinePatchBlockInfo } from "./types";
 import { EditType } from "./types";
+import { jsxTagExpressionToString } from "./utils";
 
 const BAILOUT_PROP_NAMES = new Set(["ref", "key", "children"]);
 
@@ -499,15 +500,7 @@ export class BlockAnalyzer {
         // Handle PropertyAccessExpression (e.g., Ctx.Provider, React.Fragment)
         if (ts.isPropertyAccessExpression(tagName)) {
             // Return a string representation for ID generation
-            const getText = (expr: ts.Expression): string => {
-                if (ts.isIdentifier(expr)) {
-                    return expr.text;
-                } else if (ts.isPropertyAccessExpression(expr)) {
-                    return getText(expr.expression) + "." + expr.name.text;
-                }
-                return "Unknown";
-            };
-            return getText(tagName.expression) + "." + tagName.name.text;
+            return jsxTagExpressionToString(tagName.expression) + "." + tagName.name.text;
         }
 
         return "UnknownTag";
