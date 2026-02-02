@@ -18,21 +18,29 @@ import type { OptimizationContext, PropInfo, StaticElementInfo, TransformResult,
  * - Lowercase tags (frame, textlabel) become string literals
  * - PascalCase tags (Counter, MyComponent) become identifiers
  * - Property access (Ctx.Provider) preserves the expression
+ * - Namespaced names (ns:tag) are converted to string literals
  */
-function createTagReference(tagName: string | ts.Expression): ts.Expression {
-    // If already an expression (e.g., PropertyAccessExpression), use it as-is
-    if (typeof tagName !== "string") {
-        return tagName;
+function createTagReference(tagName: string | ts.JsxTagNameExpression): ts.Expression {
+    // If it's a string, convert it to the appropriate form
+    if (typeof tagName === "string") {
+        // Check if tag name starts with uppercase (PascalCase component)
+        if (tagName[0] && tagName[0] === tagName[0].toUpperCase()) {
+            // React component - use identifier
+            return ts.factory.createIdentifier(tagName);
+        } else {
+            // HTML-like element - use string literal
+            return ts.factory.createStringLiteral(tagName);
+        }
     }
 
-    // Check if tag name starts with uppercase (PascalCase component)
-    if (tagName[0] && tagName[0] === tagName[0].toUpperCase()) {
-        // React component - use identifier
-        return ts.factory.createIdentifier(tagName);
-    } else {
-        // HTML-like element - use string literal
-        return ts.factory.createStringLiteral(tagName);
+    // Handle JsxNamespacedName (e.g., <ns:tag>) - convert to string literal
+    if (ts.isJsxNamespacedName(tagName)) {
+        return ts.factory.createStringLiteral(`${tagName.namespace.text}:${tagName.name.text}`);
     }
+
+    // For Identifier, PropertyAccessExpression, or ThisExpression, use them as-is
+    // These are all valid Expression types that can be used in React.createElement
+    return tagName as ts.Expression;
 }
 
 /**
